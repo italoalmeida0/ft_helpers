@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>42 Push Swap - Playground</title>
+    <title>42 push_swap - Playground</title>
 
     <script src="coi-serviceworker.js"></script>
 
@@ -244,7 +244,7 @@
         let cmInstance;
         let wasmerInitialized = false;
 
-        const defaultCode = `// 42 Push_Swap
+        const defaultCode = `// 42 push_swap
 // ----------------------------
 // Stack A is passed as arguments (argv) to the main function.
 // Just write operations to standard output to animate the visualizer.
@@ -532,25 +532,9 @@ int main(int argc, char **argv) {
             <header class="bg-[#18181b] border-b border-[#27272a] p-3 md:p-4 flex flex-wrap items-center justify-between shrink-0 gap-3">
               <div class="flex items-center space-x-3">
                 <Icon name="swap-vert" color="3b82f6" size={28} />
-                <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 Push Swap - Playground</h1>
+                <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 push_swap</h1>
               </div>
               <div class="flex items-center space-x-4">
-                
-                {/* Benchmarks Buttons */}
-                <div class="flex space-x-2 mr-2">
-                  <button 
-                    onClick={() => generateStacks(100)}
-                    class="bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8] border border-[#3f3f46] px-3 py-1 rounded text-xs md:text-sm font-medium transition-colors"
-                  >
-                    Test 100
-                  </button>
-                  <button 
-                    onClick={() => generateStacks(500)}
-                    class="bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8] border border-[#3f3f46] px-3 py-1 rounded text-xs md:text-sm font-medium transition-colors"
-                  >
-                    Test 500
-                  </button>
-                </div>
 
                 <div class="flex items-center space-x-2 bg-[#09090b] rounded-lg p-1 border border-[#27272a]">
                   <span class="text-xs md:text-sm text-[#a1a1aa] px-2">Elements:</span>
