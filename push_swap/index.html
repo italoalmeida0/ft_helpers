@@ -21,15 +21,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
 
-    <!-- Import Map for Solid.js and Wasmer -->
+    <!-- Import Map for Solid.js -->
     <script type="importmap">
       {
         "imports": {
           "solid-js": "https://esm.sh/solid-js@1.9.12",
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
-          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
-          "@wasmer/sdk": "https://esm.sh/@wasmer/sdk"
+          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2"
         }
       }
     </script>
@@ -128,7 +127,73 @@
     <script type="text/babel" data-type="module" data-presets="solid">
       import { createSignal, createMemo, For, Show, onMount } from "solid-js";
       import { render } from "solid-js/web";
-      import { init, Wasmer, Directory } from "@wasmer/sdk";
+
+      // ==========================================
+      // WEB WORKER COMPILER SETUP
+      // ==========================================
+      const workerCode = `
+        import { init, Wasmer, Directory } from "https://esm.sh/@wasmer/sdk";
+
+        let clangInstance = null;
+        let lastCompiledCode = null;
+        let cachedWasmBytes = null;
+
+        self.onmessage = async (e) => {
+          const { code, stackA } = e.data;
+          
+          try {
+            self.postMessage({ type: 'status', msg: 'Initializing Wasmer Runtime...' });
+            await init();
+
+            if (!clangInstance) {
+              self.postMessage({ type: 'status', msg: 'Loading Compiler...' });
+              clangInstance = await Wasmer.fromRegistry("clang/clang");
+            }
+
+            let wasmBytes;
+            if (code === lastCompiledCode && cachedWasmBytes) {
+              self.postMessage({ type: 'status', msg: 'Using cached binary...' });
+              wasmBytes = cachedWasmBytes;
+            } else {
+              const project = new Directory();
+              await project.writeFile("push_swap.c", code);
+
+              self.postMessage({ type: 'status', msg: 'Compiling...' });
+              
+              let instance = await clangInstance.entrypoint.run({
+                args: ["/project/push_swap.c", "-O0", "-o", "/project/push_swap.wasm"],
+                mount: { "/project": project },
+              });
+              const output = await instance.wait();
+
+              if (!output.ok) {
+                throw new Error("Clang Compilation Failed (Exit Code: " + output.code + "):\\n" + output.stderr + "\\n" + output.stdout);
+              }
+
+              wasmBytes = await project.readFile("push_swap.wasm");
+              cachedWasmBytes = wasmBytes;
+              lastCompiledCode = code;
+            }
+
+            self.postMessage({ type: 'status', msg: 'Executing...' });
+            const pushSwapBin = await Wasmer.fromFile(wasmBytes);
+            
+            const runResult = await pushSwapBin.entrypoint.run({
+              args: ["push_swap", ...stackA.map(String)]
+            });
+            const runOutput = await runResult.wait();
+
+            if (!runOutput.ok) {
+              throw new Error("Runtime Execution Failed (Exit Code: " + runOutput.code + "):\\n" + runOutput.stderr);
+            }
+
+            self.postMessage({ type: 'done', stdout: runOutput.stdout });
+
+          } catch (err) {
+            self.postMessage({ type: 'error', error: err.message });
+          }
+        };
+      `;
 
       // ==========================================
       // ICON SYSTEM 
@@ -188,7 +253,6 @@
       // ==========================================
       // PUSH SWAP LOGIC & DATA
       // ==========================================
-      
       const OPERATIONS = [
         { id: 'sa', type: 'swap', desc: 'Swap A' },
         { id: 'sb', type: 'swap', desc: 'Swap B' },
@@ -242,7 +306,7 @@
         
         let codeEditorRef;
         let cmInstance;
-        let wasmerInitialized = false;
+        let compilerWorker = null;
 
         const defaultCode = `// 42 push_swap
 // ----------------------------
@@ -302,7 +366,6 @@ int main(int argc, char **argv) {
           }
           return { label: "N/A", class: "text-gray-500" };
         });
-        // ------------------------------------
 
         const generateStacks = (forcedCount = null) => {
           if (forcedCount) setItemCount(forcedCount);
@@ -323,9 +386,12 @@ int main(int argc, char **argv) {
           setStdoutLogs("");
         };
 
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         onMount(() => {
           generateStacks();
 
+          // Initialize CodeMirror
           if (codeEditorRef && window.CodeMirror) {
             cmInstance = CodeMirror(codeEditorRef, {
               value: scriptCode(),
@@ -342,6 +408,51 @@ int main(int argc, char **argv) {
               setExecutionError(null); 
             });
           }
+
+          // Initialize Web Worker
+          const blob = new Blob([workerCode], { type: "application/javascript" });
+          compilerWorker = new Worker(URL.createObjectURL(blob), { type: "module" });
+
+          compilerWorker.onmessage = async (e) => {
+            const { type, msg, stdout, error } = e.data;
+
+            if (type === "status") {
+              setStatusMessage(msg);
+            } 
+            else if (type === "error") {
+              setExecutionError(error);
+              setAppState("IDLE");
+            } 
+            else if (type === "done") {
+              setStdoutLogs(stdout);
+              
+              const operationsRaw = stdout.split('\n').map(s => s.trim()).filter(s => s !== '');
+              const validOpsList = ['sa', 'sb', 'ss', 'pa', 'pb', 'ra', 'rb', 'rr', 'rra', 'rrb', 'rrr'];
+              
+              const opsToAnimate = [];
+              for (let i = 0; i < operationsRaw.length; i++) {
+                const op = operationsRaw[i];
+                if (validOpsList.includes(op)) {
+                  opsToAnimate.push(op);
+                } else {
+                  console.warn('Ignoring invalid stdout line: ' + op);
+                }
+              }
+
+              setAppState("ANIMATING");
+              setStatusMessage("Animating " + opsToAnimate.length + " operations...");
+
+              for (let i = 0; i < opsToAnimate.length; i++) {
+                if (appState() !== "ANIMATING") break; 
+                
+                executeOperation(opsToAnimate[i], true);
+                const delay = opsToAnimate.length > 50 ? 5 : 150; 
+                await sleep(delay);
+              }
+              
+              setAppState("IDLE");
+            }
+          };
         });
 
         const applyOpState = (op, currentA, currentB) => {
@@ -415,92 +526,22 @@ int main(int argc, char **argv) {
           }
         };
 
-        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-        const runProgram = async () => {
+        const runProgram = () => {
           if (appState() === "ANIMATING") {
             setAppState("IDLE");
             return;
           }
-          
-          if (appState() === "COMPILING") {
-            return; 
-          }
+          if (appState() === "COMPILING") return;
           
           setAppState("COMPILING");
           setExecutionError(null);
           setStdoutLogs("");
           
-          try {
-            if (!wasmerInitialized) {
-                setStatusMessage("Initializing Wasmer Runtime...");
-                await init();
-                wasmerInitialized = true;
-            }
-
-            setStatusMessage("Loading Compiler...");
-            const clang = await Wasmer.fromRegistry("clang/clang");
-            
-            const project = new Directory();
-            await project.writeFile("push_swap.c", scriptCode());
-
-            setStatusMessage("Compiling...");
-            let instance = await clang.entrypoint.run({
-              args: ["/project/push_swap.c", "-o", "/project/push_swap.wasm"],
-              mount: { "/project": project },
-            });
-            const output = await instance.wait();
-
-            if (!output.ok) {
-              throw new Error(`Clang Compilation Failed (Exit Code: ${output.code}):\n${output.stderr}\n${output.stdout}`);
-            }
-
-            setStatusMessage("Executing...");
-            let wasmBytes = await project.readFile("push_swap.wasm");
-            const pushSwapBin = await Wasmer.fromFile(wasmBytes);
-            
-            const stackArgs = stackA().map(String);
-            const runResult = await pushSwapBin.entrypoint.run({
-                args: ["push_swap", ...stackArgs]
-            });
-            const runOutput = await runResult.wait();
-
-            if (!runOutput.ok) {
-                throw new Error(`Runtime Execution Failed (Exit Code: ${runOutput.code}):\n${runOutput.stderr}`);
-            }
-
-            const rawOutput = runOutput.stdout;
-            setStdoutLogs(rawOutput);
-
-            const operationsRaw = rawOutput.split('\n').map(s => s.trim()).filter(s => s !== '');
-            const validOpsList = ['sa', 'sb', 'ss', 'pa', 'pb', 'ra', 'rb', 'rr', 'rra', 'rrb', 'rrr'];
-            
-            const opsToAnimate = [];
-            for (let i = 0; i < operationsRaw.length; i++) {
-                const op = operationsRaw[i];
-                if (validOpsList.includes(op)) {
-                    opsToAnimate.push(op);
-                } else {
-                    console.warn(`Ignoring invalid stdout line: "${op}"`);
-                }
-            }
-
-            setAppState("ANIMATING");
-            setStatusMessage(`Animating ${opsToAnimate.length} operations...`);
-
-            for (let i = 0; i < opsToAnimate.length; i++) {
-              if (appState() !== "ANIMATING") break; 
-              
-              executeOperation(opsToAnimate[i], true);
-              const delay = opsToAnimate.length > 50 ? 5 : 150; 
-              await sleep(delay);
-            }
-            
-            setAppState("IDLE");
-          } catch (err) {
-            setExecutionError(err.message);
-            setAppState("IDLE");
-          }
+          // Send data to worker instead of locking the main thread
+          compilerWorker.postMessage({
+            code: scriptCode(),
+            stackA: stackA()
+          });
         };
 
         const renderStackItem = (value) => {
@@ -595,7 +636,7 @@ int main(int argc, char **argv) {
                 </div>
                 
                 <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase">History (Op: {historyCursor()})</h3>
+                  <h3 class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase">History</h3>
                   <div class="flex space-x-1">
                     <button 
                       onClick={handleUndo} 
