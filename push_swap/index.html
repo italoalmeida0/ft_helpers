@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>42 Push Swap</title>
+    <title>42 Push Swap - Playground</title>
 
     <script src="coi-serviceworker.js"></script>
 
@@ -272,7 +272,40 @@ int main(int argc, char **argv) {
         
         const [scriptCode, setScriptCode] = createSignal(defaultCode);
 
-        const generateStacks = () => {
+        // --- VALIDATION & BENCHMARK LOGIC ---
+        const isSorted = createMemo(() => {
+          const a = stackA();
+          const b = stackB();
+          if (b.length > 0) return false;
+          if (a.length === 0) return true;
+          for (let i = 0; i < a.length - 1; i++) {
+            if (a[i] > a[i + 1]) return false;
+          }
+          return true;
+        });
+
+        const benchmarkStatus = createMemo(() => {
+          const count = parseInt(itemCount(), 10);
+          const ops = historyCursor();
+          
+          if (count === 100) {
+            if (ops < 700) return { label: "Excellent", class: "text-emerald-500" };
+            if (ops < 1500) return { label: "Good", class: "text-blue-500" };
+            if (ops < 2000) return { label: "Pass", class: "text-yellow-500" };
+            return { label: "Fail", class: "text-red-500" };
+          } 
+          else if (count === 500) {
+            if (ops < 5500) return { label: "Excellent", class: "text-emerald-500" };
+            if (ops < 8000) return { label: "Good", class: "text-blue-500" };
+            if (ops < 12000) return { label: "Pass", class: "text-yellow-500" };
+            return { label: "Fail", class: "text-red-500" };
+          }
+          return { label: "N/A", class: "text-gray-500" };
+        });
+        // ------------------------------------
+
+        const generateStacks = (forcedCount = null) => {
+          if (forcedCount) setItemCount(forcedCount);
           const count = parseInt(itemCount(), 10) || 10;
           let newArray = Array.from({ length: count }, (_, i) => i + 1);
           
@@ -296,7 +329,7 @@ int main(int argc, char **argv) {
           if (codeEditorRef && window.CodeMirror) {
             cmInstance = CodeMirror(codeEditorRef, {
               value: scriptCode(),
-              mode: "text/x-csrc", // C syntax highlighting
+              mode: "text/x-csrc",
               theme: "vscode-dark",
               lineNumbers: true,
               tabSize: 4,
@@ -411,13 +444,13 @@ int main(int argc, char **argv) {
                 wasmerInitialized = true;
             }
 
-            setStatusMessage("Loading Clang compiler...");
+            setStatusMessage("Loading Compiler...");
             const clang = await Wasmer.fromRegistry("clang/clang");
             
             const project = new Directory();
             await project.writeFile("push_swap.c", scriptCode());
 
-            setStatusMessage("Compiling C code to WebAssembly...");
+            setStatusMessage("Compiling...");
             let instance = await clang.entrypoint.run({
               args: ["/project/push_swap.c", "-o", "/project/push_swap.wasm"],
               mount: { "/project": project },
@@ -428,11 +461,10 @@ int main(int argc, char **argv) {
               throw new Error(`Clang Compilation Failed (Exit Code: ${output.code}):\n${output.stderr}\n${output.stdout}`);
             }
 
-            setStatusMessage("Executing WebAssembly module...");
+            setStatusMessage("Executing...");
             let wasmBytes = await project.readFile("push_swap.wasm");
             const pushSwapBin = await Wasmer.fromFile(wasmBytes);
             
-            // Pass the stack elements as arguments
             const stackArgs = stackA().map(String);
             const runResult = await pushSwapBin.entrypoint.run({
                 args: ["push_swap", ...stackArgs]
@@ -446,7 +478,6 @@ int main(int argc, char **argv) {
             const rawOutput = runOutput.stdout;
             setStdoutLogs(rawOutput);
 
-            // Parse operations
             const operationsRaw = rawOutput.split('\n').map(s => s.trim()).filter(s => s !== '');
             const validOpsList = ['sa', 'sb', 'ss', 'pa', 'pb', 'ra', 'rb', 'rr', 'rra', 'rrb', 'rrr'];
             
@@ -463,12 +494,11 @@ int main(int argc, char **argv) {
             setAppState("ANIMATING");
             setStatusMessage(`Animating ${opsToAnimate.length} operations...`);
 
-            // Animate
             for (let i = 0; i < opsToAnimate.length; i++) {
               if (appState() !== "ANIMATING") break; 
               
               executeOperation(opsToAnimate[i], true);
-              const delay = opsToAnimate.length > 50 ? 25 : 150; 
+              const delay = opsToAnimate.length > 50 ? 5 : 150; 
               await sleep(delay);
             }
             
@@ -502,20 +532,37 @@ int main(int argc, char **argv) {
             <header class="bg-[#18181b] border-b border-[#27272a] p-3 md:p-4 flex flex-wrap items-center justify-between shrink-0 gap-3">
               <div class="flex items-center space-x-3">
                 <Icon name="swap-vert" color="3b82f6" size={28} />
-                <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 Push Swap</h1>
+                <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 Push Swap - Playground</h1>
               </div>
               <div class="flex items-center space-x-4">
+                
+                {/* Benchmarks Buttons */}
+                <div class="flex space-x-2 mr-2">
+                  <button 
+                    onClick={() => generateStacks(100)}
+                    class="bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8] border border-[#3f3f46] px-3 py-1 rounded text-xs md:text-sm font-medium transition-colors"
+                  >
+                    Test 100
+                  </button>
+                  <button 
+                    onClick={() => generateStacks(500)}
+                    class="bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8] border border-[#3f3f46] px-3 py-1 rounded text-xs md:text-sm font-medium transition-colors"
+                  >
+                    Test 500
+                  </button>
+                </div>
+
                 <div class="flex items-center space-x-2 bg-[#09090b] rounded-lg p-1 border border-[#27272a]">
                   <span class="text-xs md:text-sm text-[#a1a1aa] px-2">Elements:</span>
                   <input 
                     type="number" 
                     value={itemCount()} 
                     onInput={(e) => setItemCount(e.target.value)}
-                    min="1" max="500"
+                    min="1" max="1000"
                     class="w-14 md:w-16 bg-[#18181b] text-[#d4d4d8] rounded p-1 text-center border border-[#27272a] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                   />
                   <button 
-                    onClick={generateStacks}
+                    onClick={() => generateStacks()}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 md:px-4 md:py-1.5 rounded text-xs md:text-sm font-medium transition-colors"
                   >
                     Generate
@@ -568,6 +615,7 @@ int main(int argc, char **argv) {
                     )}
                   </For>
                 </div>
+                
                 <div class="flex items-center justify-between mb-2">
                   <h3 class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase">History (Op: {historyCursor()})</h3>
                   <div class="flex space-x-1">
@@ -589,7 +637,8 @@ int main(int argc, char **argv) {
                     </button>
                   </div>
                 </div>
-                <div class="flex-1 min-h-[150px] md:min-h-0 bg-[#09090b] rounded-lg border border-[#27272a] p-2 md:p-3 overflow-y-auto font-mono text-xs md:text-sm flex flex-col gap-1">
+                
+                <div class="flex-1 min-h-[120px] md:min-h-0 bg-[#09090b] rounded-lg border border-[#27272a] p-2 md:p-3 overflow-y-auto font-mono text-xs md:text-sm flex flex-col gap-1">
                   <Show when={history().length === 0}>
                     <span class="text-[#a1a1aa] italic text-center mt-4 text-xs">No operations executed.</span>
                   </Show>
@@ -602,6 +651,30 @@ int main(int argc, char **argv) {
                     )}
                   </For>
                 </div>
+
+                {/* Validation & Benchmark Status */}
+                <div class="mt-4 p-3 bg-[#09090b] rounded-lg border border-[#27272a] flex flex-col gap-2 shrink-0">
+                  <h3 class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase border-b border-[#27272a] pb-1">Validation & Benchmark</h3>
+                  <div class="flex justify-between items-center text-sm mt-1">
+                    <span class="text-[#a1a1aa]">Is Sorted?</span>
+                    <span class={isSorted() ? "text-emerald-500 font-bold" : "text-red-500 font-bold"}>
+                      {isSorted() ? "YES" : "NO"}
+                    </span>
+                  </div>
+                  <div class="flex justify-between items-center text-sm">
+                    <span class="text-[#a1a1aa]">Operations:</span>
+                    <span class="text-[#d4d4d8] font-bold">{historyCursor()}</span>
+                  </div>
+                  <Show when={parseInt(itemCount(), 10) === 100 || parseInt(itemCount(), 10) === 500}>
+                    <div class="flex justify-between items-center text-sm border-t border-[#27272a] pt-2 mt-1">
+                      <span class="text-[#a1a1aa]">Score:</span>
+                      <span class={`font-bold ${benchmarkStatus().class}`}>
+                        {benchmarkStatus().label}
+                      </span>
+                    </div>
+                  </Show>
+                </div>
+                
               </div>
 
               {/* RIGHT: Editor */}
