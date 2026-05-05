@@ -1,374 +1,695 @@
-<!DOCTYPE html>
-<html lang="pt-PT">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>push_swap</title>
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Push Swap</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Style for operation buttons */
-        .btn-op {
-            background-color: #f3f4f6;
-            border: 1px solid #d1d5db;
-            color: #374151;
-            font-weight: 600;
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            transition: all 0.2s;
+    
+    <!-- CodeMirror Core and Theme -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+
+    <!-- Import Map for Solid.js -->
+    <script type="importmap">
+      {
+        "imports": {
+          "solid-js": "https://esm.sh/solid-js@1.9.12",
+          "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
+          "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
+          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2"
         }
-        .btn-op:hover {
-            background-color: #e5e7eb;
-            border-color: #9ca3af;
-        }
-        .btn-op:active {
-            background-color: #d1d5db;
-        }
-        /* Animation class for operations */
-        .action-flash {
-            animation: flashAnim 0.5s ease-out;
-        }
-        @keyframes flashAnim {
-            0% { background-color: #fef08a; transform: scale(1.05); }
-            100% { background-color: white; transform: scale(1); }
-        }
-        /* Custom scrollbar for history */
-        .history-scroll::-webkit-scrollbar {
-            height: 6px;
-        }
-        .history-scroll::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 3px;
-        }
+      }
+    </script>
+
+    <script type="module">
+      import babelPresetSolid from "babel-preset-solid";
+      import Babel from "@babel/standalone";
+      Babel.registerPreset("solid", babelPresetSolid);
+    </script>
+
+    <style type="text/tailwindcss">
+      @theme {
+        /* Hardcoded dark theme hex colors to ensure it's always dark */
+        --color-base-100: #09090b; 
+        --color-base-200: #18181b; 
+        --color-base-300: #27272a; 
+        --color-text-main: #d4d4d8; 
+        --color-text-muted: #a1a1aa; 
+        --color-text-disabled: #52525b; 
+        --color-primary: #2563eb; 
+        --color-primary-hover: #3b82f6; 
+        --color-primary-dim: #1e3a8a; 
+        --color-primary-text: #93c5fd; 
+        --color-border-subtle: #27272a; 
+        --color-border-focus: #475569; 
+      }
+      
+      body {
+        background-color: var(--color-base-100);
+        color: var(--color-text-main);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--color-zinc-700); border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--color-zinc-600); }
+
+      button {
+        cursor: pointer;
+      }
+
+      /* Stack Items Animation */
+      .stack-item {
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      /* CodeMirror Override */
+      .CodeMirror {
+        height: 100% !important;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        background: var(--color-base-200) !important;
+        border-radius: 0.5rem;
+      }
+
+      /* Specific colors for manual operations */
+      .block-swap { background-color: #f59e0b; color: #fff; }
+      .block-push { background-color: #3b82f6; color: #fff; }
+      .block-rotate { background-color: #10b981; color: #fff; }
+      .block-rev { background-color: #8b5cf6; color: #fff; }
+
     </style>
-</head>
-<body class="bg-gray-100 min-h-screen text-gray-800 font-sans p-4 md:p-8">
+  </head>
+  <body class="bg-base-100 text-text-main">
+    <div id="root"></div>
 
-    <div class="max-w-6xl mx-auto">
-        <h1 class="text-3xl font-bold text-center mb-8 text-indigo-600">push_swap</h1>
+    <script type="text/babel" data-type="module" data-presets="solid">
+      import { createSignal, createMemo, createEffect, For, Show, onMount, onCleanup } from "solid-js";
+      import { render } from "solid-js/web";
 
-        <!-- Settings Section -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-4 flex flex-col md:flex-row items-center justify-center gap-4">
-            <input type="number" id="itemCountInput" min="1" max="100" value="10" 
-                   class="border border-gray-300 rounded-lg px-4 py-2 w-24 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+      // ==========================================
+      // ICON SYSTEM 
+      // ==========================================
+      const svgCache = new Map();
+      const svgSignals = new Map();
+
+      function getIconUrl(name, color = "e4e4e7", size = 24) {
+        return `https://api.iconify.design/material-symbols/${name}.svg?color=%23${color}&height=${size}`;
+      }
+
+      function fetchIcon(name, color = "e4e4e7", size = 24) {
+        const key = `${name}|${color}|${size}`;
+        if (svgCache.has(key)) return svgCache.get(key);
+        if (svgSignals.has(key)) return svgSignals.get(key);
+
+        const [svg, setSvg] = createSignal("");
+        svgSignals.set(key, svg);
+
+        fetch(getIconUrl(name, color, size))
+          .then((r) => r.text())
+          .then((text) => {
+            svgCache.set(key, text);
+            setSvg(text);
+            svgSignals.delete(key);
+          })
+          .catch(() => {});
+
+        return svg();
+      }
+
+      const Icon = (props) => {
+        const name = () => props.name;
+        const color = () => props.color || "e4e4e7";
+        const size = () => props.size || 24;
+        const key = () => `${name()}|${color()}|${size()}`;
+
+        const svgContent = createMemo(() => {
+          const k = key();
+          if (svgCache.has(k)) return svgCache.get(k);
+          fetchIcon(name(), color(), size());
+          const sig = svgSignals.get(k);
+          return sig ? sig() : "";
+        });
+
+        return (
+          <Show when={svgContent()}>
+            <div
+              innerHTML={svgContent()}
+              class={`inline-flex items-center justify-center ${props.class || ""}`}
+              style={{ width: `${size()}px`, height: `${size()}px` }}
+            />
+          </Show>
+        );
+      };
+
+      // ==========================================
+      // PUSH SWAP LOGIC & DATA
+      // ==========================================
+      
+      const OPERATIONS = [
+        { id: 'sa', type: 'swap', desc: 'Swap A' },
+        { id: 'sb', type: 'swap', desc: 'Swap B' },
+        { id: 'ss', type: 'swap', desc: 'Swap Both' },
+        { id: 'pa', type: 'push', desc: 'Push to A' },
+        { id: 'pb', type: 'push', desc: 'Push to B' },
+        { id: 'ra', type: 'rotate', desc: 'Rotate A' },
+        { id: 'rb', type: 'rotate', desc: 'Rotate B' },
+        { id: 'rr', type: 'rotate', desc: 'Rotate Both' },
+        { id: 'rra', type: 'rev', desc: 'Rev Rotate A' },
+        { id: 'rrb', type: 'rev', desc: 'Rev Rotate B' },
+        { id: 'rrr', type: 'rev', desc: 'Rev Rotate Both' }
+      ];
+
+      const getInverseOperation = (op) => {
+        const inverseMap = {
+          'sa': 'sa', 'sb': 'sb', 'ss': 'ss',
+          'pa': 'pb', 'pb': 'pa',
+          'ra': 'rra', 'rb': 'rrb', 'rr': 'rrr',
+          'rra': 'ra', 'rrb': 'rb', 'rrr': 'rr'
+        };
+        return inverseMap[op];
+      };
+
+      function getBlockClass(type) {
+        switch(type) {
+          case 'swap': return 'block-swap';
+          case 'push': return 'block-push';
+          case 'rotate': return 'block-rotate';
+          case 'rev': return 'block-rev';
+          default: return 'bg-gray-500 text-white';
+        }
+      }
+
+      // ==========================================
+      // WEB WORKER CODE (For isolated execution)
+      // ==========================================
+      const workerCode = `
+        self.onmessage = function(e) {
+          let stack_a = e.data.stack_a;
+          let stack_b = e.data.stack_b;
+          let opsToAnimate = [];
+
+          const mutateApply = (op) => {
+            switch(op) {
+              case 'sa': 
+                if (stack_a.length >= 2) { let t=stack_a[0]; stack_a[0]=stack_a[1]; stack_a[1]=t; } 
+                break;
+              case 'sb': 
+                if (stack_b.length >= 2) { let t=stack_b[0]; stack_b[0]=stack_b[1]; stack_b[1]=t; } 
+                break;
+              case 'ss':
+                if (stack_a.length >= 2) { let t=stack_a[0]; stack_a[0]=stack_a[1]; stack_a[1]=t; }
+                if (stack_b.length >= 2) { let t=stack_b[0]; stack_b[0]=stack_b[1]; stack_b[1]=t; }
+                break;
+              case 'pa': if (stack_b.length > 0) stack_a.unshift(stack_b.shift()); break;
+              case 'pb': if (stack_a.length > 0) stack_b.unshift(stack_a.shift()); break;
+              case 'ra': if (stack_a.length > 1) stack_a.push(stack_a.shift()); break;
+              case 'rb': if (stack_b.length > 1) stack_b.push(stack_b.shift()); break;
+              case 'rr':
+                if (stack_a.length > 1) stack_a.push(stack_a.shift());
+                if (stack_b.length > 1) stack_b.push(stack_b.shift());
+                break;
+              case 'rra': if (stack_a.length > 1) stack_a.unshift(stack_a.pop()); break;
+              case 'rrb': if (stack_b.length > 1) stack_b.unshift(stack_b.pop()); break;
+              case 'rrr':
+                if (stack_a.length > 1) stack_a.unshift(stack_a.pop());
+                if (stack_b.length > 1) stack_b.unshift(stack_b.pop());
+                break;
+            }
+            opsToAnimate.push(op);
             
-            <button id="generateButton" 
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                Gen
-            </button>
-        </div>
+            // Failsafe to prevent running out of memory in a valid but huge loop
+            if (opsToAnimate.length > 500000) {
+              throw new Error("Maximum operations limit reached (500,000 ops). Infinite loop?");
+            }
+          };
 
-        <!-- History and Undo Section -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4">
-            <button id="undoButton" disabled
-                    class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                </svg>
-                Undo
-            </button>
-            <div class="flex-1 border-l pl-4 border-gray-300 overflow-hidden flex flex-col justify-center">
-                <span class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Ops</span>
-                <div id="historyContainer" class="history-scroll overflow-x-auto flex items-center gap-2 pb-1">
-                    <span class="text-gray-400 italic text-sm" id="emptyHistoryMsg">...</span>
-                </div>
-            </div>
-            <!-- Count of operations badge -->
-            <div class="flex-shrink-0 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-bold border border-indigo-200" title="Total de operações">
-               <span id="opCountDisplay">0</span>
-            </div>
-        </div>
+          const SA = () => mutateApply('sa');
+          const SB = () => mutateApply('sb');
+          const SS = () => mutateApply('ss');
+          const PA = () => mutateApply('pa');
+          const PB = () => mutateApply('pb');
+          const RA = () => mutateApply('ra');
+          const RB = () => mutateApply('rb');
+          const RR = () => mutateApply('rr');
+          const RRA = () => mutateApply('rra');
+          const RRB = () => mutateApply('rrb');
+          const RRR = () => mutateApply('rrr');
 
-        <!-- Main Content Layout: Sidebar Operations + Main Stacks -->
-        <div class="flex flex-col lg:flex-row gap-8">
+          try {
+            const fn = new Function(
+              'stack_a', 'stack_b', 'SA', 'SB', 'SS', 'PA', 'PB', 'RA', 'RB', 'RR', 'RRA', 'RRB', 'RRR',
+              e.data.code
+            );
             
-            <!-- Left Column: Operations -->
-            <div class="lg:w-1/4 flex flex-col">
-                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-8">
-                    <div class="flex flex-col gap-5">
-                        <!-- Swaps -->
-                        <div class="flex flex-col gap-2">
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Swaps</span>
-                            <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('sa')" title="Swap A: Swap first two elements of A">sa</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('sb')" title="Swap B: Swap first two elements of B">sb</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('ss')" title="Swap both">ss</button>
-                            </div>
-                        </div>
-                        <!-- Pushes -->
-                        <div class="flex flex-col gap-2">
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Pushes</span>
-                            <div class="grid grid-cols-2 gap-2 max-w-[200px] mx-auto w-full">
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('pa')" title="Push A: Take first from B, put on A">pa</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('pb')" title="Push B: Take first from A, put on B">pb</button>
-                            </div>
-                        </div>
-                        <!-- Rotates -->
-                        <div class="flex flex-col gap-2">
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Rotates</span>
-                            <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('ra')" title="Rotate A: Shift up all elements of A">ra</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rb')" title="Rotate B: Shift up all elements of B">rb</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rr')" title="Rotate both">rr</button>
-                            </div>
-                        </div>
-                        <!-- Reverse Rotates -->
-                        <div class="flex flex-col gap-2">
-                            <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Rev. Rotates</span>
-                            <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rra')" title="Reverse Rotate A: Shift down all elements of A">rra</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rrb')" title="Reverse Rotate B: Shift down all elements of B">rrb</button>
-                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rrr')" title="Reverse Rotate both">rrr</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            // Execute user code
+            fn(stack_a, stack_b, SA, SB, SS, PA, PB, RA, RB, RR, RRA, RRB, RRR);
+            
+            self.postMessage({ success: true, ops: opsToAnimate });
+          } catch (err) {
+            self.postMessage({ success: false, error: err.message });
+          }
+        };
+      `;
 
-            <!-- Right Column: Stacks -->
-            <div class="lg:w-3/4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                <!-- Stack A Container -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[600px]">
-                    <div class="bg-indigo-50 rounded-t-xl p-4 border-b border-gray-200">
-                        <h2 class="text-xl font-bold text-center text-indigo-800">Stack a</h2>
-                    </div>
-                    <ul id="stackA" class="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/50"></ul>
-                </div>
+      // ==========================================
+      // MAIN APPLICATION COMPONENT
+      // ==========================================
+      
+      function App() {
+        // --- State ---
+        const [itemCount, setItemCount] = createSignal(10);
+        const [stackA, setStackA] = createSignal([]);
+        const [stackB, setStackB] = createSignal([]);
+        
+        // History State
+        const [history, setHistory] = createSignal([]);
+        const [historyCursor, setHistoryCursor] = createSignal(0);
+        
+        // Execution State
+        const [isPlaying, setIsPlaying] = createSignal(false);
+        const [executionError, setExecutionError] = createSignal(null);
+        let executionWorker = null; // Reference to the active Web Worker
+        
+        // CodeMirror Setup
+        let codeEditorRef;
+        let cmInstance;
 
-                <!-- Stack B Container -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 flex flex-col h-[600px]">
-                    <div class="bg-emerald-50 rounded-t-xl p-4 border-b border-gray-200">
-                        <h2 class="text-xl font-bold text-center text-emerald-800">Stack b</h2>
-                    </div>
-                    <ul id="stackB" class="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50/50"></ul>
-                </div>
+        const defaultCode = `// Push_Swap Javascript Sandbox
+// ----------------------------
+// Available Variables: stack_a, stack_b (Arrays)
+// Available Functions: SA(), SB(), SS(), PA(), PB(), 
+//                      RA(), RB(), RR(), RRA(), RRB(), RRR()
 
-            </div>
-        </div>
-    </div>
+function sort() {
+  if (stack_a.length < 2) return;
+  
+  // Example: Swap if first is bigger than second
+  if (stack_a[0] > stack_a[1]) {
+    SA();
+  }
+  
+  // Push to B
+  PB();
+}
 
-    <script>
-        // DOM Elements
-        const inputElement = document.getElementById('itemCountInput');
-        const generateButton = document.getElementById('generateButton');
-        const containerStackA = document.getElementById('stackA');
-        const containerStackB = document.getElementById('stackB');
-        const historyContainer = document.getElementById('historyContainer');
-        const emptyHistoryMsg = document.getElementById('emptyHistoryMsg');
-        const undoButton = document.getElementById('undoButton');
-        const opCountDisplay = document.getElementById('opCountDisplay');
+sort();
+`;
+        
+        const [scriptCode, setScriptCode] = createSignal(defaultCode);
 
-        // State Variables for History and Undo
-        let operationHistory = [];
-        let undoStack = []; // Stores the inverse operation to perform an undo
-
-        // Map operations to their inverse to allow "Undo"
-        const inverseOperationsMap = {
-            'sa': 'sa', 'sb': 'sb', 'ss': 'ss',
-            'pa': 'pb', 'pb': 'pa',
-            'ra': 'rra', 'rb': 'rrb', 'rr': 'rrr',
-            'rra': 'ra', 'rrb': 'rb', 'rrr': 'rr'
+        // --- Core Functions ---
+        
+        const generateStacks = () => {
+          const count = parseInt(itemCount(), 10) || 10;
+          let newArray = Array.from({ length: count }, (_, i) => i + 1);
+          
+          // Fisher-Yates shuffle
+          for (let i = newArray.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+          }
+          
+          setStackA(newArray);
+          setStackB([]);
+          setHistory([]);
+          setHistoryCursor(0);
+          setIsPlaying(false);
+          setExecutionError(null);
+          
+          if (executionWorker) {
+            executionWorker.terminate();
+            executionWorker = null;
+          }
         };
 
-        // ---------------------------------------------------------
-        // Core Logic for Item Generation
-        // ---------------------------------------------------------
-        function handleGenerateItems() {
-            const countValueString = inputElement.value;
-            const countValueNumber = parseInt(countValueString, 10);
+        onMount(() => {
+          generateStacks();
 
-            if (isNaN(countValueNumber) || countValueNumber <= 0) return;
-
-            // Reset containers and state
-            containerStackA.innerHTML = '';
-            containerStackB.innerHTML = '';
-            operationHistory = [];
-            undoStack = [];
-            updateHistoryDisplay();
-
-            const sequenceArray = [];
-            for (let index = 1; index <= countValueNumber; index++) {
-                sequenceArray.push(index);
-            }
-
-            // Shuffle array (Fisher-Yates)
-            for (let currentIndex = sequenceArray.length - 1; currentIndex > 0; currentIndex--) {
-                const randomIndex = Math.floor(Math.random() * (currentIndex + 1));
-                const temporaryValue = sequenceArray[currentIndex];
-                sequenceArray[currentIndex] = sequenceArray[randomIndex];
-                sequenceArray[randomIndex] = temporaryValue;
-            }
-
-            // Append HTML elements
-            sequenceArray.forEach(function(numberValue) {
-                const listItem = document.createElement('li');
-                listItem.className = 'bg-white border border-gray-300 rounded-lg py-3 px-4 shadow-sm flex justify-center items-center transition-colors group';
-                
-                const numberTextElement = document.createElement('span');
-                numberTextElement.className = 'text-xl font-black text-gray-700';
-                numberTextElement.textContent = numberValue;
-                
-                listItem.appendChild(numberTextElement);
-                containerStackA.appendChild(listItem);
-            });
-        }
-
-        // ---------------------------------------------------------
-        // UI Helpers
-        // ---------------------------------------------------------
-        function triggerFlashAnimation(element) {
-            if (!element) return;
-            // Reset animation
-            element.classList.remove('action-flash');
-            void element.offsetWidth; // Trigger reflow
-            element.classList.add('action-flash');
-        }
-
-        function updateHistoryDisplay() {
-            // Update operation count text
-            opCountDisplay.textContent = operationHistory.length;
-
-            if (operationHistory.length === 0) {
-                historyContainer.innerHTML = '';
-                historyContainer.appendChild(emptyHistoryMsg);
-                undoButton.disabled = true;
-                return;
-            }
-
-            historyContainer.innerHTML = '';
-            
-            operationHistory.forEach(function(opName) {
-                const badge = document.createElement('span');
-                badge.className = 'bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-2 py-1 rounded flex-shrink-0 uppercase';
-                badge.textContent = opName;
-                historyContainer.appendChild(badge);
+          // Initialize CodeMirror
+          if (codeEditorRef && window.CodeMirror) {
+            cmInstance = CodeMirror(codeEditorRef, {
+              value: scriptCode(),
+              mode: "javascript",
+              theme: "dracula",
+              lineNumbers: true,
+              tabSize: 2,
+              autoCloseBrackets: true,
+              matchBrackets: true,
             });
 
-            // Scroll history to the right
-            historyContainer.scrollLeft = historyContainer.scrollWidth;
+            cmInstance.on('change', (cm) => {
+              setScriptCode(cm.getValue());
+              setExecutionError(null); // Clear errors on edit
+            });
+          }
+        });
 
-            // Enable/Disable undo based on stack size
-            undoButton.disabled = undoStack.length === 0;
-        }
+        // Applies operation to the internal state arrays (Pure function, returns new arrays)
+        const applyOpState = (op, currentA, currentB) => {
+          let a = [...currentA];
+          let b = [...currentB];
 
-        // ---------------------------------------------------------
-        // Push_swap Operations implementation
-        // ---------------------------------------------------------
+          switch (op) {
+            case 'sa': if (a.length >= 2) [a[0], a[1]] = [a[1], a[0]]; break;
+            case 'sb': if (b.length >= 2) [b[0], b[1]] = [b[1], b[0]]; break;
+            case 'ss': 
+              if (a.length >= 2) [a[0], a[1]] = [a[1], a[0]];
+              if (b.length >= 2) [b[0], b[1]] = [b[1], b[0]];
+              break;
+            case 'pa': if (b.length > 0) a.unshift(b.shift()); break;
+            case 'pb': if (a.length > 0) b.unshift(a.shift()); break;
+            case 'ra': if (a.length > 1) a.push(a.shift()); break;
+            case 'rb': if (b.length > 1) b.push(b.shift()); break;
+            case 'rr': 
+              if (a.length > 1) a.push(a.shift());
+              if (b.length > 1) b.push(b.shift());
+              break;
+            case 'rra': if (a.length > 1) a.unshift(a.pop()); break;
+            case 'rrb': if (b.length > 1) b.unshift(b.pop()); break;
+            case 'rrr': 
+              if (a.length > 1) a.unshift(a.pop());
+              if (b.length > 1) b.unshift(b.pop());
+              break;
+          }
+          return { a, b };
+        };
 
-        function handleSwap(containerElement) {
-            if (containerElement.children.length >= 2) {
-                const firstChild = containerElement.children[0];
-                const secondChild = containerElement.children[1];
-                containerElement.insertBefore(secondChild, firstChild);
-                
-                triggerFlashAnimation(firstChild);
-                triggerFlashAnimation(secondChild);
-                return true;
-            }
-            return false;
-        }
+        // UI State execution wrapper
+        const executeOperation = (op, recordHistory = true) => {
+          const { a, b } = applyOpState(op, stackA(), stackB());
+          
+          if (JSON.stringify(a) === JSON.stringify(stackA()) && JSON.stringify(b) === JSON.stringify(stackB())) {
+            return;
+          }
 
-        function handlePush(sourceContainer, destinationContainer) {
-            if (sourceContainer.children.length > 0) {
-                const topElement = sourceContainer.children[0];
-                if (destinationContainer.firstChild) {
-                    destinationContainer.insertBefore(topElement, destinationContainer.firstChild);
-                } else {
-                    destinationContainer.appendChild(topElement);
-                }
-                
-                triggerFlashAnimation(topElement);
-                return true;
-            }
-            return false;
-        }
+          setStackA(a);
+          setStackB(b);
 
-        function handleRotate(containerElement) {
-            if (containerElement.children.length > 1) {
-                const firstChild = containerElement.children[0];
-                containerElement.appendChild(firstChild);
-                
-                triggerFlashAnimation(firstChild);
-                return true;
-            }
-            return false;
-        }
+          if (recordHistory) {
+            const currentHist = history().slice(0, historyCursor());
+            const newHist = [...currentHist, op];
+            setHistory(newHist);
+            setHistoryCursor(newHist.length);
+          }
+        };
 
-        function handleReverseRotate(containerElement) {
-            if (containerElement.children.length > 1) {
-                const lastChild = containerElement.lastElementChild;
-                containerElement.insertBefore(lastChild, containerElement.firstChild);
-                
-                triggerFlashAnimation(lastChild);
-                return true;
-            }
-            return false;
-        }
-
-        // ---------------------------------------------------------
-        // Action Dispatcher
-        // ---------------------------------------------------------
-        function executeAction(operationName, isUndoAction = false) {
-            let success = false;
-
-            switch(operationName) {
-                case 'sa': success = handleSwap(containerStackA); break;
-                case 'sb': success = handleSwap(containerStackB); break;
-                case 'ss': 
-                    const aSwapped = handleSwap(containerStackA);
-                    const bSwapped = handleSwap(containerStackB);
-                    success = aSwapped || bSwapped; 
-                    break;
-                case 'pa': success = handlePush(containerStackB, containerStackA); break;
-                case 'pb': success = handlePush(containerStackA, containerStackB); break;
-                case 'ra': success = handleRotate(containerStackA); break;
-                case 'rb': success = handleRotate(containerStackB); break;
-                case 'rr': 
-                    const aRotated = handleRotate(containerStackA);
-                    const bRotated = handleRotate(containerStackB);
-                    success = aRotated || bRotated;
-                    break;
-                case 'rra': success = handleReverseRotate(containerStackA); break;
-                case 'rrb': success = handleReverseRotate(containerStackB); break;
-                case 'rrr': 
-                    const aRevRotated = handleReverseRotate(containerStackA);
-                    const bRevRotated = handleReverseRotate(containerStackB);
-                    success = aRevRotated || bRevRotated;
-                    break;
-            }
-
-            if (success) {
-                if (!isUndoAction) {
-                    operationHistory.push(operationName);
-                    undoStack.push(inverseOperationsMap[operationName]);
-                }
-                updateHistoryDisplay();
-            }
-        }
-
-        function handleUndo() {
-            if (undoStack.length === 0) return;
-
-            // Get inverse operation
-            const inverseOperation = undoStack.pop();
+        const handleUndo = () => {
+          if (historyCursor() > 0) {
+            const cursor = historyCursor() - 1;
+            const opToRevert = history()[cursor];
+            const inverseOp = getInverseOperation(opToRevert);
             
-            // Execute it without registering it in history
-            executeAction(inverseOperation, true);
-            
-            // Remove the original action from the history log
-            operationHistory.pop();
-            
-            updateHistoryDisplay();
-        }
+            const { a, b } = applyOpState(inverseOp, stackA(), stackB());
+            setStackA(a);
+            setStackB(b);
+            setHistoryCursor(cursor);
+          }
+        };
 
-        // ---------------------------------------------------------
-        // Event Listeners for Non-Inline Buttons
-        // ---------------------------------------------------------
-        generateButton.addEventListener('click', handleGenerateItems);
-        undoButton.addEventListener('click', handleUndo);
+        const handleRedo = () => {
+          if (historyCursor() < history().length) {
+            const opToApply = history()[historyCursor()];
+            
+            const { a, b } = applyOpState(opToApply, stackA(), stackB());
+            setStackA(a);
+            setStackB(b);
+            setHistoryCursor(historyCursor() + 1);
+          }
+        };
 
-        // Generate the initial state on page load
-        window.addEventListener('DOMContentLoaded', handleGenerateItems);
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        const runProgram = () => {
+          // If already playing, pressing the button stops the execution
+          if (isPlaying()) {
+            setIsPlaying(false);
+            if (executionWorker) {
+              executionWorker.terminate();
+              executionWorker = null;
+            }
+            return;
+          }
+          
+          setExecutionError(null);
+          setIsPlaying(true);
+          
+          // Setup Web Worker to execute JS securely without blocking the main UI Thread
+          const blob = new Blob([workerCode], { type: 'application/javascript' });
+          const workerUrl = URL.createObjectURL(blob);
+          executionWorker = new Worker(workerUrl);
+          
+          // Set 10 seconds timeout
+          const timeoutId = setTimeout(() => {
+            if (executionWorker) {
+              executionWorker.terminate();
+              executionWorker = null;
+            }
+            setExecutionError("Execution Timeout: Algorithm took more than 10 seconds to execute (Infinite loop prevented).");
+            setIsPlaying(false);
+          }, 10000);
+          
+          // Handle response from the worker
+          executionWorker.onmessage = async (e) => {
+            clearTimeout(timeoutId);
+            executionWorker.terminate();
+            executionWorker = null;
+            
+            const result = e.data;
+            if (!result.success) {
+              setExecutionError(result.error);
+              setIsPlaying(false);
+              return;
+            }
+            
+            const opsQueue = result.ops;
+            if (opsQueue.length === 0) {
+              setIsPlaying(false);
+              return;
+            }
+            
+            // Animate operations in the UI
+            for (let i = 0; i < opsQueue.length; i++) {
+              if (!isPlaying()) break; // Interrupted by user
+              
+              executeOperation(opsQueue[i], true);
+              
+              const delay = opsQueue.length > 100 ? 20 : 150; 
+              await sleep(delay);
+            }
+            
+            setIsPlaying(false);
+          };
+          
+          // Handle unexpected worker errors
+          executionWorker.onerror = (err) => {
+            clearTimeout(timeoutId);
+            executionWorker.terminate();
+            executionWorker = null;
+            setExecutionError("Worker Error: " + err.message);
+            setIsPlaying(false);
+          };
+          
+          // Start Execution
+          executionWorker.postMessage({
+            code: scriptCode(),
+            stack_a: [...stackA()],
+            stack_b: [...stackB()]
+          });
+        };
+
+        // --- UI Rendering Helpers ---
+        const renderStackItem = (value) => {
+          const maxVal = itemCount();
+          const percentage = Math.max(10, (value / maxVal) * 100);
+          
+          return (
+            <div class="w-full flex items-center justify-center mb-1 group stack-item relative">
+              <div 
+                class="bg-blue-500 rounded-sm h-6 sm:h-8 flex items-center justify-center text-white text-xs sm:text-sm font-bold border border-blue-600 shadow-sm"
+                style={{ width: `${percentage}%` }}
+              >
+                {value}
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div class="h-screen flex flex-col overflow-hidden">
+            {/* Header */}
+            <header class="bg-base-200 border-b border-border-subtle p-4 flex items-center justify-between shrink-0">
+              <div class="flex items-center space-x-3">
+                <Icon name="swap-vert" color="3b82f6" size={28} />
+                <h1 class="text-xl font-bold text-text-main">Push Swap</h1>
+              </div>
+              <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 bg-base-100 rounded-lg p-1 border border-border-subtle">
+                  <span class="text-sm text-text-muted px-2">Items:</span>
+                  <input 
+                    type="number" 
+                    value={itemCount()} 
+                    onInput={(e) => setItemCount(e.target.value)}
+                    min="1" max="500"
+                    class="w-16 bg-base-200 text-text-main rounded p-1 text-center border border-border-subtle focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                  <button 
+                    onClick={generateStacks}
+                    class="bg-primary hover:bg-primary-hover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+            </header>
+
+            {/* Main Content Area */}
+            <div class="flex-1 flex overflow-hidden">
+              
+              {/* LEFT: Visualizer (Stacks A & B) */}
+              <div class="w-1/3 flex flex-col border-r border-border-subtle bg-base-100 p-4 shrink-0">
+                <h2 class="text-sm font-semibold text-text-disabled uppercase tracking-wider mb-4 text-center">Visualizer</h2>
+                <div class="flex-1 flex space-x-4 overflow-hidden">
+                  
+                  {/* Stack A */}
+                  <div class="flex-1 flex flex-col bg-base-200 rounded-xl border border-border-subtle overflow-hidden">
+                    <div class="bg-primary-dim p-2 text-center border-b border-border-subtle">
+                      <span class="font-bold text-primary-text">Stack A</span>
+                      <span class="text-xs text-text-muted ml-2">({stackA().length})</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 flex flex-col justify-end pb-4">
+                      <For each={stackA()}>{(item) => renderStackItem(item)}</For>
+                    </div>
+                  </div>
+
+                  {/* Stack B */}
+                  <div class="flex-1 flex flex-col bg-base-200 rounded-xl border border-border-subtle overflow-hidden">
+                    <div class="bg-base-300 p-2 text-center border-b border-border-subtle">
+                      <span class="font-bold text-text-main">Stack B</span>
+                      <span class="text-xs text-text-muted ml-2">({stackB().length})</span>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 flex flex-col justify-end pb-4">
+                      <For each={stackB()}>{(item) => renderStackItem(item)}</For>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+
+              {/* MIDDLE: Manual Controls & History Tape */}
+              <div class="w-1/4 flex flex-col border-r border-border-subtle bg-base-200 p-4 shrink-0">
+                <h2 class="text-sm font-semibold text-text-disabled uppercase tracking-wider mb-4">Manual Controls</h2>
+                
+                {/* Operations Grid */}
+                <div class="grid grid-cols-3 gap-2 mb-6">
+                  <For each={OPERATIONS}>
+                    {(op) => (
+                      <button 
+                        onClick={() => executeOperation(op.id)}
+                        disabled={isPlaying()}
+                        class={`py-2 rounded-lg text-sm font-bold uppercase transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${getBlockClass(op.type)}`}
+                        title={op.desc}
+                      >
+                        {op.id}
+                      </button>
+                    )}
+                  </For>
+                </div>
+
+                {/* History Section */}
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-xs font-semibold text-text-disabled uppercase">History (Op: {historyCursor()})</h3>
+                  <div class="flex space-x-1">
+                    <button 
+                      onClick={handleUndo} 
+                      disabled={historyCursor() === 0 || isPlaying()}
+                      class="p-1 rounded bg-base-300 hover:bg-border-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Undo"
+                    >
+                      <Icon name="undo" size={18} />
+                    </button>
+                    <button 
+                      onClick={handleRedo} 
+                      disabled={historyCursor() === history().length || isPlaying()}
+                      class="p-1 rounded bg-base-300 hover:bg-border-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                      title="Redo"
+                    >
+                      <Icon name="redo" size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div class="flex-1 bg-base-100 rounded-lg border border-border-subtle p-3 overflow-y-auto font-mono text-sm flex flex-col gap-1">
+                  <Show when={history().length === 0}>
+                    <span class="text-text-muted italic text-center mt-4">No operations.</span>
+                  </Show>
+                  <For each={history()}>
+                    {(op, idx) => (
+                      <div class={`flex items-center space-x-2 p-1 rounded ${idx() === historyCursor() - 1 ? 'bg-primary-dim text-primary-text' : idx() >= historyCursor() ? 'text-text-disabled opacity-50' : 'text-text-main'}`}>
+                        <span class="text-xs opacity-50 w-6 text-right">{idx() + 1}.</span>
+                        <span class="font-bold uppercase">{op}</span>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </div>
+
+              {/* RIGHT: Algorithm Code Editor */}
+              <div class="flex-1 flex flex-col bg-base-100 shrink-0 p-4">
+                <div class="flex items-center justify-between mb-4">
+                  <h2 class="text-sm font-semibold text-text-disabled uppercase tracking-wider">Algorithm Code (JS)</h2>
+                  <div class="flex space-x-2">
+                    <button 
+                      onClick={() => { cmInstance && cmInstance.setValue(''); setScriptCode(''); }}
+                      disabled={isPlaying()}
+                      class="flex items-center space-x-1 px-3 py-1.5 rounded-md bg-base-300 text-text-main hover:bg-border-subtle transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Icon name="delete" color="e4e4e7" size={16} />
+                      <span>Clear Code</span>
+                    </button>
+                    <button 
+                      onClick={runProgram}
+                      class={`flex items-center space-x-1 px-4 py-1.5 rounded-md transition-colors text-sm font-semibold ${isPlaying() ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                    >
+                      <Icon name={isPlaying() ? "stop" : "play-arrow"} color="ffffff" size={18} />
+                      <span>{isPlaying() ? "Stop" : "Run Algorithm"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* CodeMirror Container */}
+                <div class="flex-1 relative flex flex-col overflow-hidden border border-border-subtle rounded-lg">
+                  <div ref={codeEditorRef} class="flex-1 overflow-hidden"></div>
+                </div>
+
+                {/* Execution Error Banner */}
+                <Show when={executionError()}>
+                  <div class="mt-4 p-3 bg-red-900/30 border border-red-800 rounded-lg flex items-start space-x-3">
+                    <Icon name="error" color="ef4444" size={20} class="shrink-0 mt-0.5" />
+                    <div>
+                      <h4 class="text-sm font-bold text-red-400">Execution Error</h4>
+                      <p class="text-xs text-red-300 mt-1 font-mono break-all">{executionError()}</p>
+                    </div>
+                  </div>
+                </Show>
+
+              </div>
+
+            </div>
+          </div>
+        );
+      }
+
+      render(() => <App />, document.getElementById("root"));
     </script>
-</body>
+  </body>
 </html>
