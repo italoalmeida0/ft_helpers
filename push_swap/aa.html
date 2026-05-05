@@ -1,0 +1,27 @@
+<script src="coi-serviceworker.js"></script>
+<script type="module">
+import { init, Wasmer, Directory } from "https://esm.sh/@wasmer/sdk";
+
+await init(); // Inicializa o runtime WASM
+
+const clang = await Wasmer.fromRegistry("clang/clang");
+const dir = new Directory();
+
+// 1. Escreve o código C no sistema de arquivos virtual
+await dir.writeFile("main.c", '#include <stdio.h>\nint main() { printf("Olá do C!"); return 0; }');
+
+// 2. Compila o arquivo .c para .wasm
+const compileInstance = await clang.entrypoint.run({
+  args: ["main.c", "-o", "main.wasm"],
+  mount: { "/src": dir }
+});
+await compileInstance.wait();
+
+// 3. Carrega e executa o WASM gerado
+const wasmFile = await dir.readFile("main.wasm");
+const execution = await Wasmer.fromFile(wasmFile);
+const result = await execution.entrypoint.run();
+const output = await result.wait();
+
+console.log(output.stdout); // "Olá do C!"
+</script>
