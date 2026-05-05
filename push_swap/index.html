@@ -5,22 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>push_swap</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-        .sortable-ghost {
-            opacity: 0.4;
-            background-color: #cbd5e1;
-        }
-        .sortable-drag {
-            cursor: grabbing !important;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-        .drag-item {
-            cursor: grab;
-        }
-        .drag-item:active {
-            cursor: grabbing;
-        }
         /* Style for operation buttons */
         .btn-op {
             background-color: #f3f4f6;
@@ -38,6 +23,22 @@
         .btn-op:active {
             background-color: #d1d5db;
         }
+        /* Animation class for operations */
+        .action-flash {
+            animation: flashAnim 0.5s ease-out;
+        }
+        @keyframes flashAnim {
+            0% { background-color: #fef08a; transform: scale(1.05); }
+            100% { background-color: white; transform: scale(1); }
+        }
+        /* Custom scrollbar for history */
+        .history-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+        .history-scroll::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800 font-sans p-4 md:p-8">
@@ -46,7 +47,7 @@
         <h1 class="text-3xl font-bold text-center mb-8 text-indigo-600">push_swap</h1>
 
         <!-- Settings Section -->
-        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-6 flex flex-col md:flex-row items-center justify-center gap-4">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-4 flex flex-col md:flex-row items-center justify-center gap-4">
             <input type="number" id="itemCountInput" min="1" max="100" value="10" 
                    class="border border-gray-300 rounded-lg px-4 py-2 w-24 text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
             
@@ -56,48 +57,67 @@
             </button>
         </div>
 
+        <!-- History and Undo Section -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-6 flex items-center gap-4">
+            <button id="undoButton" disabled
+                    class="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg font-semibold transition-colors flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                Desfazer
+            </button>
+            <div class="flex-1 border-l pl-4 border-gray-300 overflow-hidden flex flex-col justify-center">
+                <span class="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-1">Histórico de Operações</span>
+                <div id="historyContainer" class="history-scroll overflow-x-auto flex items-center gap-2 pb-1">
+                    <span class="text-gray-400 italic text-sm" id="emptyHistoryMsg">Nenhuma operação realizada</span>
+                </div>
+            </div>
+            <!-- Count of operations badge -->
+            <div class="flex-shrink-0 bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm font-bold border border-indigo-200" title="Total de operações">
+                Op: <span id="opCountDisplay">0</span>
+            </div>
+        </div>
+
         <!-- Main Content Layout: Sidebar Operations + Main Stacks -->
         <div class="flex flex-col lg:flex-row gap-8">
             
             <!-- Left Column: Operations -->
             <div class="lg:w-1/4 flex flex-col">
                 <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 sticky top-8">
-                    <h2 class="text-lg font-bold text-gray-700 mb-6 text-center">Operações</h2>
-                    
                     <div class="flex flex-col gap-5">
                         <!-- Swaps -->
                         <div class="flex flex-col gap-2">
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Swaps</span>
                             <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" id="btn-sa" title="Swap A: Swap first two elements of A">sa</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-sb" title="Swap B: Swap first two elements of B">sb</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-ss" title="Swap both">ss</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('sa')" title="Swap A: Swap first two elements of A">sa</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('sb')" title="Swap B: Swap first two elements of B">sb</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('ss')" title="Swap both">ss</button>
                             </div>
                         </div>
                         <!-- Pushes -->
                         <div class="flex flex-col gap-2">
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Pushes</span>
                             <div class="grid grid-cols-2 gap-2 max-w-[200px] mx-auto w-full">
-                                <button class="btn-op text-sm px-2 py-1" id="btn-pa" title="Push A: Take first from B, put on A">pa</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-pb" title="Push B: Take first from A, put on B">pb</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('pa')" title="Push A: Take first from B, put on A">pa</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('pb')" title="Push B: Take first from A, put on B">pb</button>
                             </div>
                         </div>
                         <!-- Rotates -->
                         <div class="flex flex-col gap-2">
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Rotates</span>
                             <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" id="btn-ra" title="Rotate A: Shift up all elements of A">ra</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-rb" title="Rotate B: Shift up all elements of B">rb</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-rr" title="Rotate both">rr</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('ra')" title="Rotate A: Shift up all elements of A">ra</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rb')" title="Rotate B: Shift up all elements of B">rb</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rr')" title="Rotate both">rr</button>
                             </div>
                         </div>
                         <!-- Reverse Rotates -->
                         <div class="flex flex-col gap-2">
                             <span class="text-xs font-bold text-gray-400 uppercase tracking-wider text-center">Rev. Rotates</span>
                             <div class="grid grid-cols-3 gap-2">
-                                <button class="btn-op text-sm px-2 py-1" id="btn-rra" title="Reverse Rotate A: Shift down all elements of A">rra</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-rrb" title="Reverse Rotate B: Shift down all elements of B">rrb</button>
-                                <button class="btn-op text-sm px-2 py-1" id="btn-rrr" title="Reverse Rotate both">rrr</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rra')" title="Reverse Rotate A: Shift down all elements of A">rra</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rrb')" title="Reverse Rotate B: Shift down all elements of B">rrb</button>
+                                <button class="btn-op text-sm px-2 py-1" onclick="executeAction('rrr')" title="Reverse Rotate both">rrr</button>
                             </div>
                         </div>
                     </div>
@@ -133,21 +153,22 @@
         const generateButton = document.getElementById('generateButton');
         const containerStackA = document.getElementById('stackA');
         const containerStackB = document.getElementById('stackB');
+        const historyContainer = document.getElementById('historyContainer');
+        const emptyHistoryMsg = document.getElementById('emptyHistoryMsg');
+        const undoButton = document.getElementById('undoButton');
+        const opCountDisplay = document.getElementById('opCountDisplay');
 
-        // Initialize Sortable logic (optional manual drag)
-        new Sortable(containerStackA, {
-            group: 'sharedStacks',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            dragClass: 'sortable-drag'
-        });
+        // State Variables for History and Undo
+        let operationHistory = [];
+        let undoStack = []; // Stores the inverse operation to perform an undo
 
-        new Sortable(containerStackB, {
-            group: 'sharedStacks',
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            dragClass: 'sortable-drag'
-        });
+        // Map operations to their inverse to allow "Undo"
+        const inverseOperationsMap = {
+            'sa': 'sa', 'sb': 'sb', 'ss': 'ss',
+            'pa': 'pb', 'pb': 'pa',
+            'ra': 'rra', 'rb': 'rrb', 'rr': 'rrr',
+            'rra': 'ra', 'rrb': 'rb', 'rrr': 'rr'
+        };
 
         // ---------------------------------------------------------
         // Core Logic for Item Generation
@@ -158,8 +179,12 @@
 
             if (isNaN(countValueNumber) || countValueNumber <= 0) return;
 
+            // Reset containers and state
             containerStackA.innerHTML = '';
             containerStackB.innerHTML = '';
+            operationHistory = [];
+            undoStack = [];
+            updateHistoryDisplay();
 
             const sequenceArray = [];
             for (let index = 1; index <= countValueNumber; index++) {
@@ -177,7 +202,7 @@
             // Append HTML elements
             sequenceArray.forEach(function(numberValue) {
                 const listItem = document.createElement('li');
-                listItem.className = 'drag-item bg-white border border-gray-300 rounded-lg py-3 px-4 shadow-sm flex justify-center items-center hover:bg-indigo-50 hover:border-indigo-300 transition-colors group';
+                listItem.className = 'bg-white border border-gray-300 rounded-lg py-3 px-4 shadow-sm flex justify-center items-center transition-colors group';
                 
                 const numberTextElement = document.createElement('span');
                 numberTextElement.className = 'text-xl font-black text-gray-700';
@@ -189,80 +214,158 @@
         }
 
         // ---------------------------------------------------------
+        // UI Helpers
+        // ---------------------------------------------------------
+        function triggerFlashAnimation(element) {
+            if (!element) return;
+            // Reset animation
+            element.classList.remove('action-flash');
+            void element.offsetWidth; // Trigger reflow
+            element.classList.add('action-flash');
+        }
+
+        function updateHistoryDisplay() {
+            // Update operation count text
+            opCountDisplay.textContent = operationHistory.length;
+
+            if (operationHistory.length === 0) {
+                historyContainer.innerHTML = '';
+                historyContainer.appendChild(emptyHistoryMsg);
+                undoButton.disabled = true;
+                return;
+            }
+
+            historyContainer.innerHTML = '';
+            
+            operationHistory.forEach(function(opName) {
+                const badge = document.createElement('span');
+                badge.className = 'bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold px-2 py-1 rounded flex-shrink-0 uppercase';
+                badge.textContent = opName;
+                historyContainer.appendChild(badge);
+            });
+
+            // Scroll history to the right
+            historyContainer.scrollLeft = historyContainer.scrollWidth;
+
+            // Enable/Disable undo based on stack size
+            undoButton.disabled = undoStack.length === 0;
+        }
+
+        // ---------------------------------------------------------
         // Push_swap Operations implementation
         // ---------------------------------------------------------
 
-        // Swap: Swap the first two elements at the top of stack
         function handleSwap(containerElement) {
             if (containerElement.children.length >= 2) {
                 const firstChild = containerElement.children[0];
                 const secondChild = containerElement.children[1];
-                // Insert the second child before the first one
                 containerElement.insertBefore(secondChild, firstChild);
+                
+                triggerFlashAnimation(firstChild);
+                triggerFlashAnimation(secondChild);
+                return true;
             }
+            return false;
         }
 
-        // Push: Take the first element at the top of source and put it at the top of destination
         function handlePush(sourceContainer, destinationContainer) {
             if (sourceContainer.children.length > 0) {
                 const topElement = sourceContainer.children[0];
-                // Insert before the current first child, or just append if empty
                 if (destinationContainer.firstChild) {
                     destinationContainer.insertBefore(topElement, destinationContainer.firstChild);
                 } else {
                     destinationContainer.appendChild(topElement);
                 }
+                
+                triggerFlashAnimation(topElement);
+                return true;
             }
+            return false;
         }
 
-        // Rotate: Shift up all elements by one (first becomes last)
         function handleRotate(containerElement) {
             if (containerElement.children.length > 1) {
                 const firstChild = containerElement.children[0];
                 containerElement.appendChild(firstChild);
+                
+                triggerFlashAnimation(firstChild);
+                return true;
             }
+            return false;
         }
 
-        // Reverse Rotate: Shift down all elements by one (last becomes first)
         function handleReverseRotate(containerElement) {
             if (containerElement.children.length > 1) {
                 const lastChild = containerElement.lastElementChild;
                 containerElement.insertBefore(lastChild, containerElement.firstChild);
+                
+                triggerFlashAnimation(lastChild);
+                return true;
             }
+            return false;
         }
 
         // ---------------------------------------------------------
-        // Event Listeners for Buttons
+        // Action Dispatcher
+        // ---------------------------------------------------------
+        function executeAction(operationName, isUndoAction = false) {
+            let success = false;
+
+            switch(operationName) {
+                case 'sa': success = handleSwap(containerStackA); break;
+                case 'sb': success = handleSwap(containerStackB); break;
+                case 'ss': 
+                    const aSwapped = handleSwap(containerStackA);
+                    const bSwapped = handleSwap(containerStackB);
+                    success = aSwapped || bSwapped; 
+                    break;
+                case 'pa': success = handlePush(containerStackB, containerStackA); break;
+                case 'pb': success = handlePush(containerStackA, containerStackB); break;
+                case 'ra': success = handleRotate(containerStackA); break;
+                case 'rb': success = handleRotate(containerStackB); break;
+                case 'rr': 
+                    const aRotated = handleRotate(containerStackA);
+                    const bRotated = handleRotate(containerStackB);
+                    success = aRotated || bRotated;
+                    break;
+                case 'rra': success = handleReverseRotate(containerStackA); break;
+                case 'rrb': success = handleReverseRotate(containerStackB); break;
+                case 'rrr': 
+                    const aRevRotated = handleReverseRotate(containerStackA);
+                    const bRevRotated = handleReverseRotate(containerStackB);
+                    success = aRevRotated || bRevRotated;
+                    break;
+            }
+
+            if (success) {
+                if (!isUndoAction) {
+                    operationHistory.push(operationName);
+                    undoStack.push(inverseOperationsMap[operationName]);
+                }
+                updateHistoryDisplay();
+            }
+        }
+
+        function handleUndo() {
+            if (undoStack.length === 0) return;
+
+            // Get inverse operation
+            const inverseOperation = undoStack.pop();
+            
+            // Execute it without registering it in history
+            executeAction(inverseOperation, true);
+            
+            // Remove the original action from the history log
+            operationHistory.pop();
+            
+            updateHistoryDisplay();
+        }
+
+        // ---------------------------------------------------------
+        // Event Listeners for Non-Inline Buttons
         // ---------------------------------------------------------
         generateButton.addEventListener('click', handleGenerateItems);
-
-        // Swap Operations
-        document.getElementById('btn-sa').addEventListener('click', () => handleSwap(containerStackA));
-        document.getElementById('btn-sb').addEventListener('click', () => handleSwap(containerStackB));
-        document.getElementById('btn-ss').addEventListener('click', () => {
-            handleSwap(containerStackA);
-            handleSwap(containerStackB);
-        });
-
-        // Push Operations
-        document.getElementById('btn-pa').addEventListener('click', () => handlePush(containerStackB, containerStackA));
-        document.getElementById('btn-pb').addEventListener('click', () => handlePush(containerStackA, containerStackB));
-
-        // Rotate Operations
-        document.getElementById('btn-ra').addEventListener('click', () => handleRotate(containerStackA));
-        document.getElementById('btn-rb').addEventListener('click', () => handleRotate(containerStackB));
-        document.getElementById('btn-rr').addEventListener('click', () => {
-            handleRotate(containerStackA);
-            handleRotate(containerStackB);
-        });
-
-        // Reverse Rotate Operations
-        document.getElementById('btn-rra').addEventListener('click', () => handleReverseRotate(containerStackA));
-        document.getElementById('btn-rrb').addEventListener('click', () => handleReverseRotate(containerStackB));
-        document.getElementById('btn-rrr').addEventListener('click', () => {
-            handleReverseRotate(containerStackA);
-            handleReverseRotate(containerStackB);
-        });
+        undoButton.addEventListener('click', handleUndo);
 
         // Generate the initial state on page load
         window.addEventListener('DOMContentLoaded', handleGenerateItems);
