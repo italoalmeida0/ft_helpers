@@ -1,27 +1,41 @@
 <script src="coi-serviceworker.js"></script>
 <script type="module">
-import { init, Wasmer, Directory } from "https://esm.sh/@wasmer/sdk";
+import {
+  init,
+  Wasmer,
+  Directory
+} from "https://esm.sh/@wasmer/sdk";
 
-await init(); // Inicializa o runtime WASM
+await init();
 
 const clang = await Wasmer.fromRegistry("clang/clang");
-const dir = new Directory();
+const project = new Directory();
+await project.writeFile("example.c",
+`#include<stdio.h>
 
-// 1. Escreve o código C no sistema de arquivos virtual
-await dir.writeFile("main.c", '#include <stdio.h>\nint main() { printf("Olá do C!"); return 0; }');
+int main() {
+  printf("Hello World");
+  return 0;
+}
+`);
 
-// 2. Compila o arquivo .c para .wasm
-const compileInstance = await clang.entrypoint.run({
-  args: ["main.c", "-o", "main.wasm"],
-  mount: { "/src": dir }
+let instance = await clang.entrypoint.run({
+  args: ["/project/example.c", "-o", "/project/example.wasm"],
+  mount: { "/project": project },
 });
-await compileInstance.wait();
+const output = await instance.wait();
 
-// 3. Carrega e executa o WASM gerado
-const wasmFile = await dir.readFile("main.wasm");
-const execution = await Wasmer.fromFile(wasmFile);
-const result = await execution.entrypoint.run();
-const output = await result.wait();
+if (!output.ok) {
+  throw new Error(`Clang failed. Exit: ${output.code}:`);
+}
 
-console.log(output.stdout); // "Olá do C!"
+// The generated wasm file from clang
+let wasm = await project.readFile("example.wasm");
+
+const example = await Wasmer.fromFile(wasm);
+const result = await example.entrypoint.run();
+const outputExample = await result.wait();
+
+// This should be "Hello World"
+console.log(outputExample.stdout);
 </script>
