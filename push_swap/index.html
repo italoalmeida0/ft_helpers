@@ -344,12 +344,6 @@ int main(int argc, char **argv) {
           }
         });
 
-        const clearCode = () => {
-          if (cmInstance && appState() === "IDLE") {
-            cmInstance.setValue("");
-          }
-        };
-
         const applyOpState = (op, currentA, currentB) => {
           let a = [...currentA];
           let b = [...currentB];
@@ -673,15 +667,6 @@ int main(int argc, char **argv) {
                             <span>{statusMessage()}</span>
                         </div>
                     </Show>
-
-                    <button 
-                      onClick={clearCode}
-                      disabled={appState() !== "IDLE"}
-                      class="flex items-center space-x-1 px-2 py-1 md:px-3 md:py-1.5 rounded-md bg-[#27272a] text-[#d4d4d8] hover:bg-[#3f3f46] transition-colors text-xs md:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Icon name="delete" color="e4e4e7" size={14} />
-                      <span class="hidden sm:inline">Clear</span>
-                    </button>
                     
                     <button 
                       onClick={runProgram}
