@@ -12,7 +12,7 @@ A collection of interactive playgrounds, visualizers, and debugging tools design
 An interactive web-based playground for the 42 `push_swap` project.
 
 **Key Features:**
-* **In-Browser Compilation:** Write your C code in the built-in editor (powered by CodeMirror) and compile it directly in the browser using WebAssembly. No backend required.
+* **In-Browser Compilation:** Write your C code in the built-in editor and compile it directly in the browser using WebAssembly. No backend required.
 * **Real-time Visualization:** Watch your sorting algorithm animate step-by-step between Stack A and Stack B.
 * **Manual Controls:** Execute operations (`sa`, `pb`, `ra`, `rrr`, etc.) manually to debug edge cases, complete with a history log, Undo, and Redo capabilities.
 * **Validation & Benchmarking:** Automatically checks if Stack A is correctly sorted and grades your algorithm's performance based on the official 42 evaluation criteria (for 100 and 500 random numbers).
