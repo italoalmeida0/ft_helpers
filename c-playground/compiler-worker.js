@@ -82,6 +82,180 @@ class Memory {
   }
 }
 
+// ==========================================
+// STDIN PIPE - SharedArrayBuffer-based
+// interactive stdin for WASI programs
+// ==========================================
+//
+// SAB layout (1024 bytes total):
+//   [0..3]   (4 bytes)  - STATE: 0=IDLE, 1=DATA_READY, 2=ACK, 3=EOF, 4=CANCEL
+//   [4..7]   (4 bytes)  - LEN: number of data bytes
+//   [8..1023] (1016 bytes) - DATA buffer
+//
+// Protocol (worker reads stdin):
+//   1. Worker spins on STATE until != IDLE
+//   2. If STATE == DATA_READY: read LEN bytes from DATA, set STATE = ACK
+//   3. If STATE == EOF: return 0 bytes read (EOF)
+//   4. If STATE == CANCEL: throw error (program terminated)
+//
+// Protocol (main thread writes stdin):
+//   1. Wait until STATE == IDLE or STATE == ACK
+//   2. Write data to DATA, set LEN, set STATE = DATA_READY
+//   3. Wait for STATE == ACK (worker consumed data)
+//   4. Set STATE = IDLE
+//   5. Repeat or set STATE = EOF when done
+//
+
+const STDIN_SAB_SIZE = 1024;
+const STDIN_STATE_OFFSET = 0;
+const STDIN_LEN_OFFSET = 4;
+const STDIN_DATA_OFFSET = 8;
+const STDIN_DATA_CAPACITY = STDIN_SAB_SIZE - STDIN_DATA_OFFSET;
+
+const STDIN_STATE_IDLE = 0;
+const STDIN_STATE_DATA_READY = 1;
+const STDIN_STATE_ACK = 2;
+const STDIN_STATE_EOF = 3;
+const STDIN_STATE_CANCEL = 4;
+
+class StdinPipe {
+  constructor(sab) {
+    this.sab = sab;
+    this.int32 = new Int32Array(sab);
+    this.u8 = new Uint8Array(sab);
+  }
+
+  // Called from worker thread: read bytes into a string
+  // Returns empty string on EOF, throws on cancel
+  readSync() {
+    // Spin until data is available
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_DATA_READY) break;
+      if (state === STDIN_STATE_EOF) return '';
+      if (state === STDIN_STATE_CANCEL) throw new Error('Program terminated by user');
+      // IDLE or ACK - wait briefly then retry
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 50);
+    }
+
+    const len = Atomics.load(this.int32, STDIN_LEN_OFFSET / 4);
+    let str = '';
+    for (let i = 0; i < len; i++) {
+      str += String.fromCharCode(this.u8[STDIN_DATA_OFFSET + i]);
+    }
+
+    // Acknowledge
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_ACK);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+
+    return str;
+  }
+
+  // Check if EOF has been signaled
+  isEOF() {
+    return Atomics.load(this.int32, STDIN_STATE_OFFSET / 4) === STDIN_STATE_EOF;
+  }
+
+  // Cancel any pending read (called from main thread)
+  cancel() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_CANCEL);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Signal EOF (called from main thread)
+  signalEOF() {
+    // Wait until worker is idle
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+      if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+    }
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Reset pipe to idle state
+  reset() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, 0);
+  }
+}
+
+class StdinPipeWriter {
+  constructor(sab) {
+    this.sab = sab;
+    this.int32 = new Int32Array(sab);
+    this.u8 = new Uint8Array(sab);
+  }
+
+  // Write a string to the pipe (called from main thread)
+  write(str) {
+    if (!str || str.length === 0) return;
+
+    let offset = 0;
+    while (offset < str.length) {
+      // Wait until worker is ready for data
+      while (true) {
+        const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+        if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+        if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+        // DATA_READY - worker hasn't consumed yet, wait
+        Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+      }
+
+      // Write chunk
+      const remaining = str.length - offset;
+      const chunkLen = Math.min(remaining, STDIN_DATA_CAPACITY);
+
+      for (let i = 0; i < chunkLen; i++) {
+        this.u8[STDIN_DATA_OFFSET + i] = str.charCodeAt(offset + i);
+      }
+      offset += chunkLen;
+
+      Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, chunkLen);
+      Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_DATA_READY);
+      Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+
+      // Wait for ACK
+      while (true) {
+        const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+        if (state === STDIN_STATE_ACK) break;
+        if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+        Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+      }
+
+      // Reset to IDLE
+      Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    }
+  }
+
+  // Signal EOF to the worker
+  writeEOF() {
+    // Wait until worker is idle
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+      if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+    }
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Cancel any pending read
+  cancel() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_CANCEL);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Reset pipe to idle state
+  reset() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, 0);
+  }
+}
+
 class MemFS {
   constructor(options) {
     const compileStreaming = options.compileStreaming;
@@ -89,6 +263,7 @@ class MemFS {
     this.stdinStr = options.stdinStr || '';
     this.stdinStrPos = 0;
     this.memfsFilename = options.memfsFilename;
+    this.stdinPipe = null; // Will be set for interactive mode
 
     this.hostMem_ = null;
 
@@ -108,6 +283,7 @@ class MemFS {
 
   set hostMem(mem) { this.hostMem_ = mem; }
   setStdinStr(str) { this.stdinStr = str; this.stdinStrPos = 0; }
+  setStdinPipe(pipe) { this.stdinPipe = pipe; }
 
   addDirectory(path) {
     this.mem.check();
@@ -157,20 +333,57 @@ class MemFS {
   host_read(fd, iovs, iovs_len, nread) {
     this.hostMem_.check();
     assert(fd === 0);
-    let size = 0;
-    for (let i = 0; i < iovs_len; ++i) {
-      const buf = this.hostMem_.read32(iovs);
-      iovs += 4;
-      const len = this.hostMem_.read32(iovs);
-      iovs += 4;
-      const lenToWrite = Math.min(len, this.stdinStr.length - this.stdinStrPos);
-      if (lenToWrite === 0) break;
-      this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
-      size += lenToWrite;
-      this.stdinStrPos += lenToWrite;
-      if (lenToWrite !== len) break;
+
+    // Hybrid stdin approach:
+    // 1. First consume any pre-supplied stdin string (from textarea)
+    // 2. Once exhausted, use StdinPipe for interactive input (blocks until data available)
+    // This ensures pre-supplied input is available immediately for scanf,
+    // and interactive terminal input works after the pre-supplied data is consumed.
+
+    // Phase 1: Read from pre-supplied stdin string first
+    if (this.stdinStr && this.stdinStrPos < this.stdinStr.length) {
+      let size = 0;
+      for (let i = 0; i < iovs_len; ++i) {
+        const buf = this.hostMem_.read32(iovs);
+        iovs += 4;
+        const len = this.hostMem_.read32(iovs);
+        iovs += 4;
+        const lenToWrite = Math.min(len, this.stdinStr.length - this.stdinStrPos);
+        if (lenToWrite === 0) break;
+        this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
+        size += lenToWrite;
+        this.stdinStrPos += lenToWrite;
+        if (lenToWrite !== len) break;
+      }
+      this.hostMem_.write32(nread, size);
+      return ESUCCESS;
     }
-    this.hostMem_.write32(nread, size);
+
+    // Phase 2: Pre-supplied stdin exhausted — use interactive StdinPipe
+    if (this.stdinPipe) {
+      let totalSize = 0;
+      for (let i = 0; i < iovs_len; ++i) {
+        const buf = this.hostMem_.read32(iovs);
+        iovs += 4;
+        const len = this.hostMem_.read32(iovs);
+        iovs += 4;
+
+        if (totalSize > 0) break; // Only read into first buffer for simplicity
+
+        // Read from pipe (blocks until data available)
+        const data = this.stdinPipe.readSync();
+        if (data.length === 0) break; // EOF
+
+        const lenToWrite = Math.min(len, data.length);
+        this.hostMem_.write(buf, data.substr(0, lenToWrite));
+        totalSize += lenToWrite;
+      }
+      this.hostMem_.write32(nread, totalSize);
+      return ESUCCESS;
+    }
+
+    // Phase 3: No pipe, no more string data — return 0 (EOF)
+    this.hostMem_.write32(nread, 0);
     return ESUCCESS;
   }
 
@@ -457,6 +670,7 @@ class API {
 let api = null;
 let port = null;
 let binaryCache = null;
+let stdinPipe = null; // StdinPipe instance for interactive mode
 
 const makeApiOptions = () => ({
   readBuffer(filename) {
@@ -504,39 +718,86 @@ const onAnyMessage = async event => {
         const responseId = event.data.responseId;
         let output = '';
         let error = null;
+        let originalMemfsWrite = null;
+        let runtimeOutput = [];
 
         try {
-          const { code, args, stdin } = event.data.data || {};
+          const { code, args, stdin, stdinSAB } = event.data.data || {};
 
           await api.ready;
-          api.memfs.addFile('program.c', code);
+          api.memfs.addFile('main.c', code);
 
           const clang = await api.getModule(api.clangFilename);
           await api.run(clang, 'clang', '-cc1', '-emit-obj',
-                        ...api.clangCommonArgs, '-O2', '-o', 'program.o', '-x', 'c', 'program.c');
+                        ...api.clangCommonArgs, '-O2', '-o', 'main.o', '-x', 'c', 'main.c');
 
-          await api.link('program.o', 'a.out');
+          await api.link('main.o', 'a.out');
 
           const buffer = api.memfs.getFileContents('a.out');
           const wasmMod = await WebAssembly.compile(buffer);
 
-          const originalMemfsWrite = api.memfs.hostWrite;
-          const runtimeOutput = [];
+          // Set up stdin: hybrid mode — pre-supplied string + interactive pipe
+          // IMPORTANT: Set this up BEFORE wrapping hostWrite, so that
+          // the stdin pipe is ready when the program starts reading.
+          //
+          // Hybrid approach: Keep the stdin string as pre-supplied input that
+          // is consumed first (immediately available for scanf), then switch
+          // to the interactive StdinPipe for terminal input. This prevents
+          // the race condition where scanf gets EOF before the user can type.
+          if (stdinSAB) {
+            stdinPipe = new StdinPipe(stdinSAB);
+            api.memfs.setStdinPipe(stdinPipe);
+            api.memfs.setStdinStr(stdin || ''); // Pre-supplied stdin consumed first
+          } else {
+            stdinPipe = null;
+            api.memfs.setStdinPipe(null);
+            api.memfs.setStdinStr(stdin || '');
+          }
+
+          // Now wrap hostWrite for output capture
+          originalMemfsWrite = api.memfs.hostWrite;
           api.memfs.hostWrite = (s) => {
             runtimeOutput.push(s);
             originalMemfsWrite(s);
           };
 
-          api.memfs.setStdinStr(stdin || '');
           await api.run(wasmMod, 'a.out', ...args);
 
           api.memfs.hostWrite = originalMemfsWrite;
           output = runtimeOutput.join('');
         } catch (err) {
-          error = err.message || String(err);
+          // If the error is from user cancellation, don't treat as error
+          if (err.message === 'Program terminated by user') {
+            // Normal termination, not an error
+          } else {
+            error = err.message || String(err);
+          }
+          if (originalMemfsWrite) {
+            api.memfs.hostWrite = originalMemfsWrite;
+          }
+          output = runtimeOutput ? runtimeOutput.join('') : '';
+        } finally {
+          stdinPipe = null;
+          api.memfs.setStdinPipe(null);
         }
 
         port.postMessage({ id: 'runAsync', responseId, data: { output, error } });
+        break;
+      }
+
+      case 'cancelRun': {
+        // Cancel any pending stdin read
+        if (stdinPipe) {
+          stdinPipe.cancel();
+        }
+        break;
+      }
+
+      case 'stdinEOF': {
+        // Signal EOF to the stdin pipe
+        if (stdinPipe) {
+          stdinPipe.signalEOF();
+        }
         break;
       }
     }

@@ -509,13 +509,13 @@ const onAnyMessage = async event => {
           const { code, args, stdin } = event.data.data || {};
 
           await api.ready;
-          api.memfs.addFile('program.c', code);
+          api.memfs.addFile('main.c', code);
 
           const clang = await api.getModule(api.clangFilename);
           await api.run(clang, 'clang', '-cc1', '-emit-obj',
-                        ...api.clangCommonArgs, '-O2', '-o', 'program.o', '-x', 'c', 'program.c');
+                        ...api.clangCommonArgs, '-O2', '-o', 'main.o', '-x', 'c', 'main.c');
 
-          await api.link('program.o', 'a.out');
+          await api.link('main.o', 'a.out');
 
           const buffer = api.memfs.getFileContents('a.out');
           const wasmMod = await WebAssembly.compile(buffer);

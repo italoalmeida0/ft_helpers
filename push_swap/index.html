@@ -26,7 +26,11 @@
           "xterm": "https://esm.sh/xterm@5.3.0",
           "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0",
           "codemirror": "https://esm.sh/codemirror@6.0.2",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.0",
           "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
+          "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
+          "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
+          "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
@@ -125,9 +129,13 @@
       import { FitAddon } from "xterm-addon-fit";
       
       // CodeMirror 6 Imports
-      import { basicSetup, EditorView } from "codemirror";
+      import { keymap } from "@codemirror/view";
+      import { basicSetup, EditorView  } from "codemirror";
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
+      import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+      import { indentWithTab } from "@codemirror/commands";
+      import { Prec } from '@codemirror/state';
 
       // ==========================================
       // WORKER API
@@ -341,16 +349,16 @@ void sa() { printf("sa\\n"); }
 void pa() { printf("pa\\n"); }
 
 int main(int argc, char **argv) {
-    if (argc < 2) return 0;
-    
-    // Example: Push first element to B, swap next two, push back to A.
-    // In a real push_swap, you would parse argv[] to build your stacks.
-    
-    pb();
-    sa();
-    pa();
-    
-    return 0;
+  if (argc < 2) return 0;
+  
+  // Example: Push first element to B, swap next two, push back to A.
+  // In a real push_swap, you would parse argv[] to build your stacks.
+  
+  pb();
+  sa();
+  pa();
+  
+  return 0;
 }
 `;
         
@@ -426,8 +434,18 @@ int main(int argc, char **argv) {
               doc: scriptCode(),
               extensions: [
                 basicSetup,
+                keymap.of([indentWithTab]),
+                indentationMarkers(),
                 cpp(),
                 vscodeDark,
+                Prec.highest(
+                  keymap.of([
+                    {
+                      key: 'Mod-s',
+                      run: () => ({}),
+                    },
+                  ])
+                ),
                 EditorView.updateListener.of((update) => {
                   if (update.docChanged) {
                     const newCode = update.state.doc.toString();
