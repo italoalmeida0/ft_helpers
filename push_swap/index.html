@@ -13,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
     <!-- xterm.js CSS -->
-    <link rel="stylesheet" href="https://esm.sh/xterm@5.3.0/css/xterm.css" />
+    <link rel="stylesheet" href="https://esm.sh/@xterm/xterm@6.0.0/css/xterm.css" />
 
     <!-- Import Map including CodeMirror 6 -->
     <script type="importmap">
@@ -23,8 +23,10 @@
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
           "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
-          "xterm": "https://esm.sh/xterm@5.3.0",
-          "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0",
+          "@xterm/xterm": "https://esm.sh/@xterm/xterm@6.0.0",
+          "@xterm/addon-fit": "https://esm.sh/@xterm/addon-fit@0.11.0",
+          "@xterm/addon-webgl": "https://esm.sh/@xterm/addon-webgl@0.19.0",
+          "@xterm/addon-unicode-graphemes": "https://esm.sh/@xterm/addon-unicode-graphemes@0.4.0",
           "codemirror": "https://esm.sh/codemirror@6.0.2",
           "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.0",
           "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
@@ -125,9 +127,11 @@
     <script type="text/babel" data-type="module" data-presets="solid">
       import { createSignal, createMemo, For, Show, onMount } from "solid-js";
       import { render } from "solid-js/web";
-      import { Terminal } from "xterm";
-      import { FitAddon } from "xterm-addon-fit";
-      
+      import { Terminal } from "@xterm/xterm";
+      import { FitAddon } from "@xterm/addon-fit";
+      import { WebglAddon } from "@xterm/addon-webgl";
+      import { UnicodeGraphemesAddon } from "@xterm/addon-unicode-graphemes";
+
       // CodeMirror 6 Imports
       import { keymap } from "@codemirror/view";
       import { basicSetup, EditorView  } from "codemirror";
@@ -472,10 +476,13 @@ int main(int argc, char **argv) {
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 13,
             cursorBlink: true,
+            allowProposedApi: true,
             convertEol: true
           });
           fitAddon = new FitAddon();
           termInstance.loadAddon(fitAddon);
+          termInstance.loadAddon(new UnicodeGraphemesAddon());
+          termInstance.loadAddon(new WebglAddon());
 
           if (terminalRef) {
             termInstance.open(terminalRef);

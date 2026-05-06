@@ -1,13 +1,18 @@
 const ESUCCESS = 0;
 
+const _textDecoder = new TextDecoder();
+const _textEncoder = new TextEncoder();
+
 function readStr(u8, o, len = -1) {
-  let str = '';
   let end = u8.length;
   if (len != -1) end = o + len;
-  for (let i = o; i < end && u8[i] != 0; ++i) {
-    str += String.fromCharCode(u8[i]);
+  // Find null terminator within the range
+  let actualEnd = o;
+  for (let i = o; i < end; ++i) {
+    if (u8[i] === 0) break;
+    actualEnd = i + 1;
   }
-  return str;
+  return _textDecoder.decode(u8.subarray(o, actualEnd));
 }
 
 function assert(cond) {
@@ -64,16 +69,20 @@ class Memory {
   readStr(o, len) { return readStr(this.u8, o, len); }
 
   writeStr(o, str) {
-    o += this.write(o, str);
-    this.write8(o, 0);
-    return str.length + 1;
+    const bytes = _textEncoder.encode(str);
+    const len = this.write(o, bytes);
+    this.write8(o + len, 0);
+    return len + 1;
   }
 
   write(o, buf) {
     if (buf instanceof ArrayBuffer) {
       return this.write(o, new Uint8Array(buf));
     } else if (typeof buf === 'string') {
-      return this.write(o, buf.split('').map(x => x.charCodeAt(0)));
+      const bytes = _textEncoder.encode(buf);
+      const dst = new Uint8Array(this.buffer, o, bytes.length);
+      dst.set(bytes);
+      return bytes.length;
     } else {
       const dst = new Uint8Array(this.buffer, o, buf.length);
       dst.set(buf);
@@ -139,10 +148,7 @@ class StdinPipe {
     }
 
     const len = Atomics.load(this.int32, STDIN_LEN_OFFSET / 4);
-    let str = '';
-    for (let i = 0; i < len; i++) {
-      str += String.fromCharCode(this.u8[STDIN_DATA_OFFSET + i]);
-    }
+    const str = _textDecoder.decode(this.u8.subarray(STDIN_DATA_OFFSET, STDIN_DATA_OFFSET + len));
 
     // Acknowledge
     Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_ACK);
@@ -193,8 +199,11 @@ class StdinPipeWriter {
   write(str) {
     if (!str || str.length === 0) return;
 
+    // Encode the entire string to UTF-8 bytes first
+    const bytes = _textEncoder.encode(str);
     let offset = 0;
-    while (offset < str.length) {
+
+    while (offset < bytes.length) {
       // Wait until worker is ready for data
       while (true) {
         const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
@@ -205,11 +214,11 @@ class StdinPipeWriter {
       }
 
       // Write chunk
-      const remaining = str.length - offset;
+      const remaining = bytes.length - offset;
       const chunkLen = Math.min(remaining, STDIN_DATA_CAPACITY);
 
       for (let i = 0; i < chunkLen; i++) {
-        this.u8[STDIN_DATA_OFFSET + i] = str.charCodeAt(offset + i);
+        this.u8[STDIN_DATA_OFFSET + i] = bytes[offset + i];
       }
       offset += chunkLen;
 
@@ -288,23 +297,26 @@ class MemFS {
   addDirectory(path) {
     this.mem.check();
     this.mem.write(this.exports.GetPathBuf(), path);
-    this.exports.AddDirectoryNode(path.length);
+    this.exports.AddDirectoryNode(_textEncoder.encode(path).length);
   }
 
   addFile(path, contents) {
-    const length = contents instanceof ArrayBuffer ? contents.byteLength : contents.length;
+    // Convert string contents to UTF-8 bytes to get accurate byte length
+    const bytes = (contents instanceof ArrayBuffer) ? new Uint8Array(contents) :
+                  (typeof contents === 'string') ? _textEncoder.encode(contents) : contents;
+    const length = bytes.length;
     this.mem.check();
     this.mem.write(this.exports.GetPathBuf(), path);
-    const inode = this.exports.AddFileNode(path.length, length);
+    const inode = this.exports.AddFileNode(_textEncoder.encode(path).length, length);
     const addr = this.exports.GetFileNodeAddress(inode);
     this.mem.check();
-    this.mem.write(addr, contents);
+    this.mem.write(addr, bytes);
   }
 
   getFileContents(path) {
     this.mem.check();
     this.mem.write(this.exports.GetPathBuf(), path);
-    const inode = this.exports.FindNode(path.length);
+    const inode = this.exports.FindNode(_textEncoder.encode(path).length);
     const addr = this.exports.GetFileNodeAddress(inode);
     const size = this.exports.GetFileNodeSize(inode);
     return new Uint8Array(this.mem.buffer, addr, size);
@@ -341,20 +353,31 @@ class MemFS {
     // and interactive terminal input works after the pre-supplied data is consumed.
 
     // Phase 1: Read from pre-supplied stdin string first
+    // Use UTF-8 byte encoding for stdin data to match WASI expectations
     if (this.stdinStr && this.stdinStrPos < this.stdinStr.length) {
+      // Encode the remaining stdin string to UTF-8 bytes
+      const remaining = this.stdinStr.substring(this.stdinStrPos);
+      const stdinBytes = _textEncoder.encode(remaining);
+      let byteOffset = 0;
       let size = 0;
       for (let i = 0; i < iovs_len; ++i) {
         const buf = this.hostMem_.read32(iovs);
         iovs += 4;
         const len = this.hostMem_.read32(iovs);
         iovs += 4;
-        const lenToWrite = Math.min(len, this.stdinStr.length - this.stdinStrPos);
+        const lenToWrite = Math.min(len, stdinBytes.length - byteOffset);
         if (lenToWrite === 0) break;
-        this.hostMem_.write(buf, this.stdinStr.substr(this.stdinStrPos, lenToWrite));
+        const chunk = stdinBytes.subarray(byteOffset, byteOffset + lenToWrite);
+        this.hostMem_.write(buf, chunk);
         size += lenToWrite;
-        this.stdinStrPos += lenToWrite;
+        byteOffset += lenToWrite;
         if (lenToWrite !== len) break;
       }
+      // Advance stdinStrPos by the number of characters that were fully consumed
+      // We need to figure out how many characters the consumed bytes represent
+      const consumedBytes = byteOffset;
+      const consumedStr = _textDecoder.decode(stdinBytes.subarray(0, consumedBytes));
+      this.stdinStrPos += consumedStr.length;
       this.hostMem_.write32(nread, size);
       return ESUCCESS;
     }
@@ -374,8 +397,10 @@ class MemFS {
         const data = this.stdinPipe.readSync();
         if (data.length === 0) break; // EOF
 
-        const lenToWrite = Math.min(len, data.length);
-        this.hostMem_.write(buf, data.substr(0, lenToWrite));
+        // Encode the string data to UTF-8 bytes and write to WASM memory
+        const dataBytes = _textEncoder.encode(data);
+        const lenToWrite = Math.min(len, dataBytes.length);
+        this.hostMem_.write(buf, dataBytes.subarray(0, lenToWrite));
         totalSize += lenToWrite;
       }
       this.hostMem_.write32(nread, totalSize);
@@ -454,7 +479,7 @@ class App {
     const names = Object.getOwnPropertyNames(this.environ);
     for (const name of names) {
       const value = this.environ[name];
-      size += name.length + value.length + 2;
+      size += _textEncoder.encode(name).length + _textEncoder.encode(value).length + 2;
     }
     this.mem.write64(environ_count_out, names.length);
     this.mem.write64(environ_buf_size_out, size);
@@ -477,7 +502,7 @@ class App {
     this.mem.check();
     let size = 0;
     for (let arg of this.argv) {
-      size += arg.length + 1;
+      size += _textEncoder.encode(arg).length + 1;
     }
     this.mem.write64(argc_out, this.argv.length);
     this.mem.write64(argv_buf_size_out, size);
