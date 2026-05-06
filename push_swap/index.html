@@ -14,14 +14,17 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- CodeMirror 5 Core, Mode and Addons -->
+    <!-- CodeMirror 5 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
 
-    <!-- Import Map for Solid.js and Wasmer -->
+    <!-- xterm.js CSS -->
+    <link rel="stylesheet" href="https://esm.sh/xterm@5.3.0/css/xterm.css" />
+
+    <!-- Import Map -->
     <script type="importmap">
       {
         "imports": {
@@ -29,7 +32,9 @@
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
           "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
-          "@wasmer/sdk": "https://esm.sh/@wasmer/sdk"
+          "@wasmer/sdk": "https://esm.sh/@wasmer/sdk",
+          "xterm": "https://esm.sh/xterm@5.3.0",
+          "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0"
         }
       }
     </script>
@@ -120,6 +125,11 @@
         animation: spin 1s linear infinite;
       }
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      
+      /* xterm.js custom scrollbar integration fix */
+      .xterm-viewport::-webkit-scrollbar { width: 8px; }
+      .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
+      .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
     </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8]">
@@ -129,6 +139,8 @@
       import { createSignal, createMemo, For, Show, onMount } from "solid-js";
       import { render } from "solid-js/web";
       import { init, Wasmer, Directory } from "@wasmer/sdk";
+      import { Terminal } from "xterm";
+      import { FitAddon } from "xterm-addon-fit";
 
       // ==========================================
       // ICON SYSTEM 
@@ -235,14 +247,18 @@
         const [history, setHistory] = createSignal([]);
         const [historyCursor, setHistoryCursor] = createSignal(0);
         
-        const [appState, setAppState] = createSignal("IDLE"); // IDLE, COMPILING, ANIMATING
+        const [appState, setAppState] = createSignal("IDLE");
         const [statusMessage, setStatusMessage] = createSignal("");
         const [executionError, setExecutionError] = createSignal(null);
-        const [stdoutLogs, setStdoutLogs] = createSignal("");
         
         let codeEditorRef;
         let cmInstance;
         let wasmerInitialized = false;
+
+        // Terminal references
+        let terminalRef;
+        let termInstance;
+        let fitAddon;
 
         const defaultCode = `// 42 push_swap
 // ----------------------------
@@ -302,7 +318,6 @@ int main(int argc, char **argv) {
           }
           return { label: "N/A", class: "text-gray-500" };
         });
-        // ------------------------------------
 
         const generateStacks = (forcedCount = null) => {
           if (forcedCount) setItemCount(forcedCount);
@@ -320,12 +335,13 @@ int main(int argc, char **argv) {
           setHistoryCursor(0);
           setAppState("IDLE");
           setExecutionError(null);
-          setStdoutLogs("");
+          if (termInstance) termInstance.clear();
         };
 
         onMount(() => {
           generateStacks();
 
+          // Initialize CodeMirror
           if (codeEditorRef && window.CodeMirror) {
             cmInstance = CodeMirror(codeEditorRef, {
               value: scriptCode(),
@@ -341,6 +357,29 @@ int main(int argc, char **argv) {
               setScriptCode(cm.getValue());
               setExecutionError(null); 
             });
+          }
+
+          // Initialize xterm.js
+          termInstance = new Terminal({
+            theme: { background: '#1e1e1e', foreground: '#d4d4d8' },
+            fontFamily: "'Courier New', Courier, monospace",
+            fontSize: 13,
+            cursorBlink: true,
+            convertEol: true
+          });
+          fitAddon = new FitAddon();
+          termInstance.loadAddon(fitAddon);
+
+          if (terminalRef) {
+            termInstance.open(terminalRef);
+            fitAddon.fit();
+            
+            const resizeObserver = new ResizeObserver(() => {
+              try { fitAddon.fit(); } catch(e) {}
+            });
+            resizeObserver.observe(terminalRef);
+            
+            termInstance.writeln("\x1b[36mTerminal ready. Logs will appear here.\x1b[0m");
           }
         });
 
@@ -423,28 +462,29 @@ int main(int argc, char **argv) {
             return;
           }
           
-          if (appState() === "COMPILING") {
-            return; 
-          }
+          if (appState() === "COMPILING") return; 
           
           setAppState("COMPILING");
           setExecutionError(null);
-          setStdoutLogs("");
+          termInstance.clear();
           
           try {
             if (!wasmerInitialized) {
                 setStatusMessage("Initializing Wasmer Runtime...");
+                termInstance.writeln("\x1b[33mInitializing Wasmer Runtime...\x1b[0m");
                 await init();
                 wasmerInitialized = true;
             }
 
             setStatusMessage("Loading Compiler...");
+            termInstance.writeln("\x1b[33mLoading Clang Compiler...\x1b[0m");
             const clang = await Wasmer.fromRegistry("clang/clang");
             
             const project = new Directory();
             await project.writeFile("push_swap.c", scriptCode());
 
             setStatusMessage("Compiling...");
+            termInstance.writeln("\x1b[34mCompiling push_swap.c ...\x1b[0m");
             let instance = await clang.entrypoint.run({
               args: ["/project/push_swap.c", "-o", "/project/push_swap.wasm"],
               mount: { "/project": project },
@@ -456,6 +496,7 @@ int main(int argc, char **argv) {
             }
 
             setStatusMessage("Executing...");
+            termInstance.writeln("\x1b[32mBuild successful. Executing binary...\x1b[0m\n");
             let wasmBytes = await project.readFile("push_swap.wasm");
             const pushSwapBin = await Wasmer.fromFile(wasmBytes);
             
@@ -470,7 +511,7 @@ int main(int argc, char **argv) {
             }
 
             const rawOutput = runOutput.stdout;
-            setStdoutLogs(rawOutput);
+            termInstance.write(rawOutput);
 
             const operationsRaw = rawOutput.split('\n').map(s => s.trim()).filter(s => s !== '');
             const validOpsList = ['sa', 'sb', 'ss', 'pa', 'pb', 'ra', 'rb', 'rr', 'rra', 'rrb', 'rrr'];
@@ -480,13 +521,12 @@ int main(int argc, char **argv) {
                 const op = operationsRaw[i];
                 if (validOpsList.includes(op)) {
                     opsToAnimate.push(op);
-                } else {
-                    console.warn(`Ignoring invalid stdout line: "${op}"`);
                 }
             }
 
             setAppState("ANIMATING");
             setStatusMessage(`Animating ${opsToAnimate.length} operations...`);
+            termInstance.writeln(`\n\x1b[35m[Visualizer] Animating ${opsToAnimate.length} valid operations...\x1b[0m`);
 
             for (let i = 0; i < opsToAnimate.length; i++) {
               if (appState() !== "ANIMATING") break; 
@@ -497,8 +537,10 @@ int main(int argc, char **argv) {
             }
             
             setAppState("IDLE");
+            termInstance.writeln(`\x1b[32m[Visualizer] Finished.\x1b[0m`);
           } catch (err) {
             setExecutionError(err.message);
+            termInstance.writeln(`\n\x1b[31m${err.message}\x1b[0m`);
             setAppState("IDLE");
           }
         };
@@ -529,7 +571,6 @@ int main(int argc, char **argv) {
                 <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 push_swap</h1>
               </div>
               <div class="flex items-center space-x-4">
-
                 <div class="flex items-center space-x-2 bg-[#09090b] rounded-lg p-1 border border-[#27272a]">
                   <span class="text-xs md:text-sm text-[#a1a1aa] px-2">Elements:</span>
                   <input 
@@ -553,10 +594,10 @@ int main(int argc, char **argv) {
             <div class="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden bg-[#09090b]">
               
               {/* LEFT: Visualizer */}
-              <div class="w-full md:w-1/3 min-h-[35vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-[#27272a] bg-[#09090b] p-3 md:p-4 shrink-0">
+              <div class="w-full md:w-1/3 h-[40vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-[#27272a] bg-[#09090b] p-3 md:p-4 shrink-0">
                 <div class="flex-1 flex space-x-4 overflow-hidden">
                   <div class="flex-1 flex flex-col bg-[#18181b] rounded-xl border border-[#27272a] overflow-hidden">
-                    <div class="bg-[#1e3a8a] p-2 text-center border-b border-[#27272a]">
+                    <div class="bg-[#1e3a8a] p-2 text-center border-b border-[#27272a] shrink-0">
                       <span class="font-bold text-[#93c5fd] text-sm md:text-base">Stack A</span>
                       <span class="text-xs text-[#a1a1aa] ml-1">({stackA().length})</span>
                     </div>
@@ -565,7 +606,7 @@ int main(int argc, char **argv) {
                     </div>
                   </div>
                   <div class="flex-1 flex flex-col bg-[#18181b] rounded-xl border border-[#27272a] overflow-hidden">
-                    <div class="bg-[#27272a] p-2 text-center border-b border-[#27272a]">
+                    <div class="bg-[#27272a] p-2 text-center border-b border-[#27272a] shrink-0">
                       <span class="font-bold text-[#d4d4d8] text-sm md:text-base">Stack B</span>
                       <span class="text-xs text-[#a1a1aa] ml-1">({stackB().length})</span>
                     </div>
@@ -577,9 +618,9 @@ int main(int argc, char **argv) {
               </div>
 
               {/* MIDDLE: Controls */}
-              <div class="w-full md:w-1/4 min-h-[40vh] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-[#27272a] bg-[#18181b] p-3 md:p-4 shrink-0">
-                <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider mb-3 md:mb-4">Manual Control</h2>
-                <div class="grid grid-cols-3 gap-2 mb-4 md:mb-6">
+              <div class="w-full md:w-1/4 h-[auto] md:h-full flex flex-col border-b md:border-b-0 md:border-r border-[#27272a] bg-[#18181b] p-3 md:p-4 shrink-0">
+                <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider mb-3 md:mb-4 shrink-0">Manual Control</h2>
+                <div class="grid grid-cols-3 gap-2 mb-4 md:mb-6 shrink-0">
                   <For each={OPERATIONS}>
                     {(op) => (
                       <button 
@@ -594,7 +635,7 @@ int main(int argc, char **argv) {
                   </For>
                 </div>
                 
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center justify-between mb-2 shrink-0">
                   <h3 class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase">History</h3>
                   <div class="flex space-x-1">
                     <button 
@@ -616,7 +657,8 @@ int main(int argc, char **argv) {
                   </div>
                 </div>
                 
-                <div class="flex-1 min-h-[120px] md:min-h-0 bg-[#09090b] rounded-lg border border-[#27272a] p-2 md:p-3 overflow-y-auto font-mono text-xs md:text-sm flex flex-col gap-1">
+                {/* Fixed height on mobile for history so it doesn't grow infinitely */}
+                <div class="h-[150px] md:h-auto md:flex-1 bg-[#09090b] rounded-lg border border-[#27272a] p-2 md:p-3 overflow-y-auto font-mono text-xs md:text-sm flex flex-col gap-1 shrink-0 md:shrink">
                   <Show when={history().length === 0}>
                     <span class="text-[#a1a1aa] italic text-center mt-4 text-xs">No operations executed.</span>
                   </Show>
@@ -655,8 +697,8 @@ int main(int argc, char **argv) {
                 
               </div>
 
-              {/* RIGHT: Editor */}
-              <div class="w-full md:flex-1 min-h-[50vh] md:h-full flex flex-col bg-[#09090b] shrink-0 p-3 md:p-4 min-w-0">
+              {/* RIGHT: Editor & Terminal */}
+              <div class="w-full md:flex-1 h-[65vh] md:h-full flex flex-col bg-[#09090b] shrink-0 p-3 md:p-4 min-w-0">
                 <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 gap-2 shrink-0">
                   <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider">C Program Editor</h2>
                   <div class="flex items-center space-x-3 self-end sm:self-auto">
@@ -680,19 +722,17 @@ int main(int argc, char **argv) {
                 </div>
 
                 {/* CodeMirror 5 Container */}
-                <div class="flex-1 relative min-h-[300px] md:min-h-0 overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e]">
+                <div class="flex-1 relative min-h-[250px] overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e]">
                   <div ref={codeEditorRef} class="absolute inset-0"></div>
                 </div>
 
-                <Show when={executionError()}>
-                  <div class="mt-3 md:mt-4 p-2 md:p-3 bg-red-900/30 border border-red-800 rounded-lg flex items-start space-x-2 md:space-x-3 shrink-0">
-                    <Icon name="error" color="ef4444" size={16} class="shrink-0 mt-0.5 md:mt-0" />
-                    <div>
-                      <h4 class="text-xs md:text-sm font-bold text-red-400">Compilation / Execution Error</h4>
-                      <pre class="text-[10px] md:text-xs text-red-300 mt-1 font-mono whitespace-pre-wrap">{executionError()}</pre>
-                    </div>
+                {/* xterm.js Terminal Logs */}
+                <div class="h-[200px] md:h-[30%] shrink-0 mt-3 flex flex-col">
+                  <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider mb-2">Terminal Logs</h2>
+                  <div class="flex-1 relative overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e] p-2">
+                    <div ref={terminalRef} class="absolute inset-0 p-1"></div>
                   </div>
-                </Show>
+                </div>
 
               </div>
             </div>
