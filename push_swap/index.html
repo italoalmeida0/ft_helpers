@@ -9,20 +9,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
-    <!-- CodeMirror 5 -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/matchbrackets.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
-
     <!-- xterm.js CSS -->
     <link rel="stylesheet" href="https://esm.sh/xterm@5.3.0/css/xterm.css" />
 
-    <!-- Import Map -->
+    <!-- Import Map including CodeMirror 6 -->
     <script type="importmap">
       {
         "imports": {
@@ -31,7 +24,10 @@
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
           "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
           "xterm": "https://esm.sh/xterm@5.3.0",
-          "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0"
+          "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0",
+          "codemirror": "https://esm.sh/codemirror@6.0.2",
+          "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
+          "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
     </script>
@@ -42,27 +38,26 @@
       Babel.registerPreset("solid", babelPresetSolid);
     </script>
 
-    <style type="text/tailwindcss">
-      @layer base {
-        :root {
-          --color-base-100: #09090b; 
-          --color-base-200: #18181b; 
-          --color-base-300: #27272a; 
-          --color-text-main: #d4d4d8; 
-          --color-text-muted: #a1a1aa; 
-          --color-text-disabled: #52525b; 
-          --color-primary: #2563eb; 
-          --color-primary-hover: #3b82f6; 
-          --color-primary-dim: #1e3a8a; 
-          --color-primary-text: #93c5fd; 
-          --color-border-subtle: #27272a; 
-          --color-border-focus: #475569; 
-        }
-        body {
-          background-color: var(--color-base-100);
-          color: var(--color-text-main);
-          font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-        }
+    <style>
+      :root {
+        --color-base-100: #09090b; 
+        --color-base-200: #18181b; 
+        --color-base-300: #27272a; 
+        --color-text-main: #d4d4d8; 
+        --color-text-muted: #a1a1aa; 
+        --color-text-disabled: #52525b; 
+        --color-primary: #2563eb; 
+        --color-primary-hover: #3b82f6; 
+        --color-primary-dim: #1e3a8a; 
+        --color-primary-text: #93c5fd; 
+        --color-border-subtle: #27272a; 
+        --color-border-focus: #475569; 
+      }
+      
+      body {
+        background-color: var(--color-base-100);
+        color: var(--color-text-main);
+        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
       }
       
       ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -79,39 +74,18 @@
       .block-rotate { background-color: #10b981; color: #fff; }
       .block-rev { background-color: #8b5cf6; color: #fff; }
 
-      /* VS Code Dark Theme for CodeMirror 5 */
-      .cm-s-vscode-dark.CodeMirror {
-        background: #1e1e1e !important;
-        color: #d4d4d8 !important;
+      /* CodeMirror 6 Custom Overrides */
+      .cm-editor {
+        height: 100%;
+        width: 100%;
         position: absolute !important;
-        top: 0; left: 0; right: 0; bottom: 0;
-        height: 100% !important;
-        width: 100% !important;
         border-radius: 0.5rem;
+      }
+      .cm-scroller {
         font-family: 'Courier New', Courier, monospace;
         font-size: 14px;
+        overflow: auto;
       }
-      .cm-s-vscode-dark .CodeMirror-gutters { background: #1e1e1e; border-right: none; }
-      .cm-s-vscode-dark .CodeMirror-linenumber { color: #858585; }
-      .cm-s-vscode-dark .CodeMirror-cursor { border-left: 2px solid #d4d4d8; }
-      .cm-s-vscode-dark .cm-keyword { color: #c586c0; }
-      .cm-s-vscode-dark .cm-type { color: #4ec9b0; }
-      .cm-s-vscode-dark .cm-builtin { color: #4ec9b0; }
-      .cm-s-vscode-dark .cm-number { color: #b5cea8; }
-      .cm-s-vscode-dark .cm-def { color: #dcdcaa; }
-      .cm-s-vscode-dark .cm-variable { color: #9cdcfe; }
-      .cm-s-vscode-dark .cm-variable-2 { color: #9cdcfe; }
-      .cm-s-vscode-dark .cm-operator { color: #d4d4d8; }
-      .cm-s-vscode-dark .cm-comment { color: #6a9955; }
-      .cm-s-vscode-dark .cm-string { color: #ce9178; }
-      .cm-s-vscode-dark .cm-meta { color: #569cd6; }
-      .cm-s-vscode-dark .CodeMirror-matchingbracket { 
-        background-color: rgba(255,255,255,0.1); 
-        border-bottom: 1px solid #d4d4d8;
-        color: #d4d4d8 !important;
-      }
-      .cm-s-vscode-dark .CodeMirror-selected { background: #264f78 !important; }
-      .cm-s-vscode-dark .CodeMirror-focused .CodeMirror-selected { background: #264f78 !important; }
 
       .spinner {
         border: 2px solid rgba(255,255,255,0.1);
@@ -121,6 +95,7 @@
         height: 16px;
         animation: spin 1s linear infinite;
       }
+      
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       
       /* xterm.js custom scrollbar integration fix */
@@ -131,7 +106,7 @@
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8]">
     <script>
-      // Force unregister all service workers to prevent binary corruption
+      if (!window.location.href.endsWith('/')) window.location.replace(window.location.href + '/');
       if (navigator.serviceWorker) {
         navigator.serviceWorker.getRegistrations().then(regs => {
           for (const reg of regs) {
@@ -148,6 +123,11 @@
       import { render } from "solid-js/web";
       import { Terminal } from "xterm";
       import { FitAddon } from "xterm-addon-fit";
+      
+      // CodeMirror 6 Imports
+      import { basicSetup, EditorView } from "codemirror";
+      import { cpp } from "@codemirror/lang-cpp";
+      import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 
       // ==========================================
       // WORKER API
@@ -204,10 +184,10 @@
 
       async function loadWasmClangBinaries() {
         const files = [
-          { name: 'clang', url: 'clang' },
-          { name: 'lld', url: 'lld' },
-          { name: 'memfs', url: 'memfs' },
-          { name: 'sysroot', url: 'sysroot.tar' },
+          { name: 'clang', url: '../clang' },
+          { name: 'lld', url: '../lld' },
+          { name: 'memfs', url: '../memfs' },
+          { name: 'sysroot', url: '../sysroot.tar' },
         ];
         const binaries = {};
         for (const f of files) {
@@ -341,6 +321,7 @@
         
         let codeEditorRef;
         let cmInstance;
+        let saveTimeout;
 
         // Terminal references
         let terminalRef;
@@ -354,7 +335,6 @@
 // Just write operations to standard output to animate the visualizer.
 
 #include <stdio.h>
-#include <stdlib.h>
 
 void pb() { printf("pb\\n"); }
 void sa() { printf("sa\\n"); }
@@ -374,7 +354,18 @@ int main(int argc, char **argv) {
 }
 `;
         
-        const [scriptCode, setScriptCode] = createSignal(defaultCode);
+        const LOCAL_STORAGE_KEY = 'push_swap_code';
+        
+        const loadSavedCode = () => {
+          try {
+            const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+            return saved !== null ? saved : defaultCode;
+          } catch (e) {
+            return defaultCode;
+          }
+        };
+        
+        const [scriptCode, setScriptCode] = createSignal(loadSavedCode());
 
         // --- VALIDATION & BENCHMARK LOGIC ---
         const isSorted = createMemo(() => {
@@ -429,21 +420,31 @@ int main(int argc, char **argv) {
         onMount(async () => {
           generateStacks();
 
-          // Initialize CodeMirror
-          if (codeEditorRef && window.CodeMirror) {
-            cmInstance = CodeMirror(codeEditorRef, {
-              value: scriptCode(),
-              mode: "text/x-csrc",
-              theme: "vscode-dark",
-              lineNumbers: true,
-              tabSize: 4,
-              autoCloseBrackets: true,
-              matchBrackets: true,
-            });
-
-            cmInstance.on('change', (cm) => {
-              setScriptCode(cm.getValue());
-              setExecutionError(null); 
+          // Initialize CodeMirror 6
+          if (codeEditorRef) {
+            cmInstance = new EditorView({
+              doc: scriptCode(),
+              extensions: [
+                basicSetup,
+                cpp(),
+                vscodeDark,
+                EditorView.updateListener.of((update) => {
+                  if (update.docChanged) {
+                    const newCode = update.state.doc.toString();
+                    setScriptCode(newCode);
+                    setExecutionError(null);
+                    
+                    // Debounce save to localStorage (1 second)
+                    if (saveTimeout) clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(() => {
+                      try {
+                        localStorage.setItem(LOCAL_STORAGE_KEY, newCode);
+                      } catch (e) {}
+                    }, 1000);
+                  }
+                })
+              ],
+              parent: codeEditorRef
             });
           }
 
@@ -467,7 +468,6 @@ int main(int argc, char **argv) {
             });
             resizeObserver.observe(terminalRef);
             
-            termInstance.writeln("\x1b[36mTerminal ready. Logs will appear here.\x1b[0m");
           }
 
           try {
@@ -475,6 +475,7 @@ int main(int argc, char **argv) {
             compilerApi = new CompilerWorkerAPI((data) => {
               if (termInstance) termInstance.write(data);
             }, binaries);
+            termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m\n");
           } catch (err) {
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
           }
@@ -607,6 +608,20 @@ int main(int argc, char **argv) {
             setExecutionError(err.message);
             termInstance.writeln(`\n\x1b[31m${err.message}\x1b[0m`);
             setAppState("IDLE");
+          }
+        };
+
+        const resetToDefault = () => {
+          if (confirm('Reset code to default? This will overwrite your current code.')) {
+            setScriptCode(defaultCode);
+            if (cmInstance) {
+              cmInstance.dispatch({
+                changes: { from: 0, to: cmInstance.state.doc.length, insert: defaultCode }
+              });
+            }
+            try {
+              localStorage.removeItem(LOCAL_STORAGE_KEY);
+            } catch (e) {}
           }
         };
 
@@ -776,6 +791,16 @@ int main(int argc, char **argv) {
                     </Show>
                     
                     <button 
+                      onClick={resetToDefault}
+                      disabled={appState() === "COMPILING" || appState() === "ANIMATING"}
+                      class="flex items-center space-x-1 px-3 py-1 md:px-4 md:py-1.5 rounded-md transition-colors text-xs md:text-sm font-semibold disabled:opacity-50 bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8]"
+                      title="Reset to default code"
+                    >
+                      <Icon name="refresh" color="d4d4d8" size={16} />
+                      <span>Reset</span>
+                    </button>
+                    
+                    <button 
                       onClick={runProgram}
                       disabled={appState() === "COMPILING"}
                       class={`flex items-center space-x-1 px-3 py-1 md:px-4 md:py-1.5 rounded-md transition-colors text-xs md:text-sm font-semibold disabled:opacity-50 ${appState() === "ANIMATING" ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
@@ -786,7 +811,7 @@ int main(int argc, char **argv) {
                   </div>
                 </div>
 
-                {/* CodeMirror 5 Container */}
+                {/* CodeMirror 6 Container */}
                 <div class="flex-1 relative min-h-[250px] overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e]">
                   <div ref={codeEditorRef} class="absolute inset-0"></div>
                 </div>
