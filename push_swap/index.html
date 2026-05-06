@@ -32,7 +32,7 @@
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
           "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
-          "@wasmer/sdk": "https://esm.sh/@wasmer/sdk",
+          "@wasmer/sdk": "https://esm.sh/@wasmer/sdk@0.10.0",
           "xterm": "https://esm.sh/xterm@5.3.0",
           "xterm-addon-fit": "https://esm.sh/xterm-addon-fit@0.8.0"
         }
@@ -470,14 +470,11 @@ int main(int argc, char **argv) {
           
           try {
             if (!wasmerInitialized) {
-                setStatusMessage("Initializing Wasmer Runtime...");
-                termInstance.writeln("\x1b[33mInitializing Wasmer Runtime...\x1b[0m");
                 await init();
                 wasmerInitialized = true;
             }
 
             setStatusMessage("Loading Compiler...");
-            termInstance.writeln("\x1b[33mLoading Clang Compiler...\x1b[0m");
             const clang = await Wasmer.fromRegistry("clang/clang");
             
             const project = new Directory();
@@ -502,7 +499,7 @@ int main(int argc, char **argv) {
             
             const stackArgs = stackA().map(String);
             const runResult = await pushSwapBin.entrypoint.run({
-                args: ["push_swap", ...stackArgs]
+                args: stackArgs
             });
             const runOutput = await runResult.wait();
 
