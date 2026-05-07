@@ -148,7 +148,10 @@ class StdinPipe {
     }
 
     const len = Atomics.load(this.int32, STDIN_LEN_OFFSET / 4);
-    const str = _textDecoder.decode(this.u8.subarray(STDIN_DATA_OFFSET, STDIN_DATA_OFFSET + len));
+    // Must copy into a non-shared Uint8Array because TextDecoder.decode()
+    // rejects views backed by SharedArrayBuffer
+    const copy = new Uint8Array(this.u8.subarray(STDIN_DATA_OFFSET, STDIN_DATA_OFFSET + len));
+    const str = _textDecoder.decode(copy);
 
     // Acknowledge
     Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_ACK);

@@ -15,7 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 
     <!-- xterm.js CSS -->
-    <link rel="stylesheet" href="https://esm.sh/@xterm/xterm@6.0.0/css/xterm.css" />
+    <link rel="stylesheet" href="../xterm-6.0.0.css" />
 
     <!-- Import Map including CodeMirror 6 -->
     <script type="importmap">
@@ -462,17 +462,21 @@ int main()
         const [stdinInput, setStdinInput] = createSignal("");
         const [activeTab, setActiveTab] = createSignal("terminal"); // 'terminal' | 'stdin'
 
+        // Line buffer for canonical (cooked) mode editing
+        let _lineBuffer = '';
+
         // Handle terminal input during interactive mode
+        // Implements canonical mode: line editing (backspace) + send on Enter
         const handleTerminalData = (data) => {
           if (appState() !== "RUNNING" || !stdinPipeWriter) return;
 
-          // Check for control characters
           for (let i = 0; i < data.length; i++) {
             const code = data.charCodeAt(i);
 
             // Ctrl+C (0x03) - terminate program
             if (code === 3) {
               termInstance.writeln("^C");
+              _lineBuffer = '';
               stdinPipeWriter.cancel();
               return;
             }
@@ -480,16 +484,60 @@ int main()
             // Ctrl+D (0x04) - send EOF
             if (code === 4) {
               termInstance.writeln("^D");
+              _lineBuffer = '';
               stdinPipeWriter.writeEOF().catch(() => {});
               return;
             }
+
+            // Ctrl+U (0x15) - kill line (erase entire line)
+            if (code === 0x15) {
+              if (_lineBuffer.length > 0) {
+                // Move cursor back, erase with spaces, move cursor back again
+                termInstance.write('\b \b'.repeat(_lineBuffer.length));
+                _lineBuffer = '';
+              }
+              continue;
+            }
+
+            // Ctrl+W (0x17) - delete word backwards
+            if (code === 0x17) {
+              // Trim trailing spaces, then find last word boundary
+              let trimmed = _lineBuffer.replace(/\s+$/, '');
+              const deleteCount = _lineBuffer.length - trimmed.length + (trimmed.match(/\s\S*$/) ? trimmed.match(/\s\S*$/)[0].length : trimmed.length);
+              if (deleteCount > 0) {
+                termInstance.write('\b \b'.repeat(deleteCount));
+                _lineBuffer = _lineBuffer.substring(0, _lineBuffer.length - deleteCount);
+              }
+              continue;
+            }
+
+            // Backspace (0x7F) or DEL (0x08) - delete last character
+            if (code === 0x7F || code === 0x08) {
+              if (_lineBuffer.length > 0) {
+                // Remove last character from buffer
+                // Handle multi-byte: remove last code point
+                _lineBuffer = [..._lineBuffer].slice(0, -1).join('');
+                // Erase on terminal: move back, write space, move back
+                termInstance.write('\b \b');
+              }
+              continue;
+            }
+
+            // Enter / Return (0x0D) - flush line buffer to program
+            if (code === 0x0D) {
+              const line = _lineBuffer + '\n';
+              _lineBuffer = '';
+              // Echo newline to terminal
+              termInstance.write('\r\n');
+              // Send the complete line to the program
+              stdinPipeWriter.write(line).catch(() => {});
+              continue;
+            }
+
+            // Regular printable character - add to line buffer and echo
+            _lineBuffer += data[i];
+            termInstance.write(data[i]);
           }
-
-          // Write the data to the stdin pipe (async, fire-and-forget)
-          stdinPipeWriter.write(data).catch(() => {});
-
-          // Echo the input back to the terminal (so user sees what they typed)
-          termInstance.write(data);
         };
 
         onMount(async () => {
@@ -558,13 +606,16 @@ int main()
             resizeObserver.observe(terminalRef);
           }
 
+          termInstance.writeln("\x1b[33mLoading compiler...\x1b[0m\n");
           try {
             const binaries = await loadWasmClangBinaries();
             compilerApi = new CompilerWorkerAPI((data) => {
               if (termInstance) termInstance.write(data);
             }, binaries);
+            termInstance.clear();
             termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m");
           } catch (err) {
+            termInstance.clear();
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
           }
         });
@@ -616,6 +667,7 @@ int main()
               stdinSAB = sab;
               stdinPipeWriter = new StdinPipeWriter(sab);
               stdinPipeWriter.reset();
+              _lineBuffer = '';
             }
 
             // Set up terminal input listener for interactive mode

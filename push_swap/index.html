@@ -13,7 +13,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
     <!-- xterm.js CSS -->
-    <link rel="stylesheet" href="https://esm.sh/@xterm/xterm@6.0.0/css/xterm.css" />
+    <link rel="stylesheet" href="../xterm-6.0.0.css" />
 
     <!-- Import Map including CodeMirror 6 -->
     <script type="importmap">
@@ -495,13 +495,16 @@ int main(int argc, char **argv) {
             
           }
 
+          termInstance.writeln("\x1b[33mLoading compiler...\x1b[0m\n");
           try {
             const binaries = await loadWasmClangBinaries();
             compilerApi = new CompilerWorkerAPI((data) => {
               if (termInstance) termInstance.write(data);
             }, binaries);
+            termInstance.clear();
             termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m\n");
           } catch (err) {
+            termInstance.clear();
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
           }
         });
