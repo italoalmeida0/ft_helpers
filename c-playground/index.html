@@ -117,7 +117,9 @@
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8] h-screen flex flex-col overflow-hidden">
     <script>
-      if (!window.location.href.endsWith('/')) window.location.replace(window.location.href + '/');
+      const url = new URL(window.location.href);
+      if (!url.pathname.endsWith('/')) 
+        window.location.replace(`${url.origin}${url.pathname}/${url.hash ? url.hash : ''}`);
     </script>
     <div id="root" class="h-full"></div>
 
@@ -447,7 +449,67 @@ int main()
 `;
 
         const LOCAL_STORAGE_KEY = 'c_playground_code';
-        
+
+        // ==========================================
+        // SHARE VIA URL HASH (no backend)
+        // Uses gzip + base64url encoding in the hash
+        // ==========================================
+        const compressToHash = async (code) => {
+          const blob = new Blob([code]);
+          const cs = new CompressionStream('gzip');
+          const stream = blob.stream().pipeThrough(cs);
+          const compressed = await new Response(stream).arrayBuffer();
+          const bytes = new Uint8Array(compressed);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        };
+
+        const decompressFromHash = async (hashStr) => {
+          const base64 = hashStr.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+          const binary = atob(padded);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes]);
+          const ds = new DecompressionStream('gzip');
+          const stream = blob.stream().pipeThrough(ds);
+          return await new Response(stream).text();
+        };
+
+        const loadFromHash = async () => {
+          const hash = window.location.hash.slice(1);
+          if (!hash) return null;
+          try {
+            return await decompressFromHash(hash);
+          } catch (e) {
+            console.warn('Failed to decode hash:', e);
+            return null;
+          }
+        };
+
+        const shareCode = async () => {
+          try {
+            const compressed = await compressToHash(scriptCode());
+            const url = window.location.origin + window.location.pathname + '#' + compressed;
+            await navigator.clipboard.writeText(url);
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2000);
+          } catch (e) {
+            // Fallback: change the URL hash directly
+            const compressed = await compressToHash(scriptCode());
+            window.location.hash = compressed;
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2000);
+          }
+        };
+
+        const [shareStatus, setShareStatus] = createSignal("idle"); // idle | copied
+
         const loadSavedCode = () => {
           try {
             const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -541,6 +603,15 @@ int main()
         };
 
         onMount(async () => {
+          // Check for shared code in URL hash
+          const hashCode = await loadFromHash();
+          if (hashCode) {
+            setScriptCode(hashCode);
+            if (cmInstance) {
+              // Will be set after CM init below
+            }
+          }
+
           // Initialize CodeMirror 6
           if (codeEditorRef) {
             cmInstance = new EditorView({
@@ -737,7 +808,16 @@ int main()
               </div>
 
               <div class="flex items-center space-x-1 md:space-x-2 shrink-0">
-              
+
+                <button
+                  onClick={shareCode}
+                  class={`p-2 rounded-lg transition-colors flex ${shareStatus() === 'copied' ? 'bg-emerald-600 text-white' : 'bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa]'}`}
+                  title={shareStatus() === 'copied' ? 'Link copied!' : 'Share Code'}
+                >
+                  <Show when={shareStatus() === 'copied'} fallback={<Icon name="share" size={18} />}>
+                    <Icon name="check" color="ffffff" size={18} />
+                  </Show>
+                </button>
                 <button
                   onClick={resetCode}
                   disabled={appState() === "COMPILING" || appState() === "RUNNING"}

@@ -112,7 +112,9 @@
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8]">
     <script>
-      if (!window.location.href.endsWith('/')) window.location.replace(window.location.href + '/');
+      const url = new URL(window.location.href);
+      if (!url.pathname.endsWith('/')) 
+        window.location.replace(`${url.origin}${url.pathname}/${url.hash ? url.hash : ''}`)
       if (navigator.serviceWorker) {
         navigator.serviceWorker.getRegistrations().then(regs => {
           for (const reg of regs) {
@@ -367,7 +369,66 @@ int main(int argc, char **argv) {
 `;
         
         const LOCAL_STORAGE_KEY = 'push_swap_code';
-        
+
+        // ==========================================
+        // SHARE VIA URL HASH (no backend)
+        // Uses gzip + base64url encoding in the hash
+        // ==========================================
+        const compressToHash = async (code) => {
+          const blob = new Blob([code]);
+          const cs = new CompressionStream('gzip');
+          const stream = blob.stream().pipeThrough(cs);
+          const compressed = await new Response(stream).arrayBuffer();
+          const bytes = new Uint8Array(compressed);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        };
+
+        const decompressFromHash = async (hashStr) => {
+          const base64 = hashStr.replace(/-/g, '+').replace(/_/g, '/');
+          const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+          const binary = atob(padded);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([bytes]);
+          const ds = new DecompressionStream('gzip');
+          const stream = blob.stream().pipeThrough(ds);
+          return await new Response(stream).text();
+        };
+
+        const loadFromHash = async () => {
+          const hash = window.location.hash.slice(1);
+          if (!hash) return null;
+          try {
+            return await decompressFromHash(hash);
+          } catch (e) {
+            console.warn('Failed to decode hash:', e);
+            return null;
+          }
+        };
+
+        const shareCode = async () => {
+          try {
+            const compressed = await compressToHash(scriptCode());
+            const url = window.location.origin + window.location.pathname + '#' + compressed;
+            await navigator.clipboard.writeText(url);
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2000);
+          } catch (e) {
+            const compressed = await compressToHash(scriptCode());
+            window.location.hash = compressed;
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2000);
+          }
+        };
+
+        const [shareStatus, setShareStatus] = createSignal("idle"); // idle | copied
+
         const loadSavedCode = () => {
           try {
             const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -431,6 +492,12 @@ int main(int argc, char **argv) {
 
         onMount(async () => {
           generateStacks();
+
+          // Check for shared code in URL hash
+          const hashCode = await loadFromHash();
+          if (hashCode) {
+            setScriptCode(hashCode);
+          }
 
           // Initialize CodeMirror 6
           if (codeEditorRef) {
@@ -681,18 +748,28 @@ int main(int argc, char **argv) {
               <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2 bg-[#09090b] rounded-lg p-1 border border-[#27272a]">
                   <span class="text-xs md:text-sm text-[#a1a1aa] px-2">Elements:</span>
-                  <input 
-                    type="number" 
-                    value={itemCount()} 
+                  <input
+                    type="number"
+                    value={itemCount()}
                     onInput={(e) => setItemCount(e.target.value)}
                     min="1" max="1000"
                     class="w-14 md:w-16 bg-[#18181b] text-[#d4d4d8] rounded p-1 text-center border border-[#27272a] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
                   />
-                  <button 
+                  <button
                     onClick={() => generateStacks()}
                     class="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 md:px-4 md:py-1.5 rounded text-xs md:text-sm font-medium transition-colors"
                   >
                     Generate
+                  </button>
+                  <button
+                    onClick={shareCode}
+                    class={`px-3 py-1 md:px-4 md:py-1.5 rounded text-xs md:text-sm font-medium transition-colors flex items-center space-x-1 ${shareStatus() === 'copied' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa]'}`}
+                    title={shareStatus() === 'copied' ? 'Link copied!' : 'Share Code'}
+                  >
+                    <Show when={shareStatus() === 'copied'} fallback={<Icon name="share" size={14} />}>
+                      <Icon name="check" color="ffffff" size={14} />
+                    </Show>
+                    <span>{shareStatus() === 'copied' ? 'Copied!' : 'Share'}</span>
                   </button>
                 </div>
               </div>
