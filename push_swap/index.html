@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>42 push_swap - Playground</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -56,14 +56,26 @@
         --color-primary-hover: #3b82f6; 
         --color-primary-dim: #1e3a8a; 
         --color-primary-text: #93c5fd; 
-        --color-border-subtle: #27272a; 
+        --color-border-subtle: #27272a;
         --color-border-focus: #475569; 
+        --fullh: 100vh;
       }
       
+      @supports (height: 100dvh) {
+          :root {
+            --fullh: 100dvh;
+          }
+        }
+
       body {
         background-color: var(--color-base-100);
         color: var(--color-text-main);
         font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        overscroll-behavior: none;
+      }
+      
+      body, html {
+        height: var(--fullh);
       }
       
       ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -121,7 +133,7 @@
       }
     </style>
   </head>
-  <body class="bg-[#09090b] text-[#d4d4d8]">
+  <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
     <script>
       const url = new URL(window.location.href);
       if (!url.pathname.endsWith('/')) 
@@ -135,7 +147,7 @@
         });
       }
     </script>
-    <div id="root"></div>
+    <div id="root" class="h-full relative"></div>
 
     <script type="text/babel" data-type="module" data-presets="solid">
       import { createSignal, createMemo, For, Show, onMount } from "solid-js";
@@ -748,7 +760,7 @@ int main(int argc, char **argv) {
         };
 
         return (
-          <div class="h-screen flex flex-col overflow-hidden">
+          <div class="h-full flex flex-col overflow-hidden">
             
             {/* Header */}
             <header class="bg-[#18181b] border-b border-[#27272a] p-3 md:p-4 flex flex-wrap items-center justify-between shrink-0 gap-3">
