@@ -108,6 +108,17 @@
       .xterm-viewport::-webkit-scrollbar { width: 8px; }
       .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
       .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+
+      /* Terminal scroll buttons */
+      .term-scroll-btn {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .term-scroll-btn:active {
+        background-color: #3f3f46 !important;
+      }
     </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8]">
@@ -922,10 +933,59 @@ int main(int argc, char **argv) {
                 </div>
 
                 {/* xterm.js Terminal Logs */}
-                <div class="h-[200px] md:h-[30%] shrink-0 mt-3 flex flex-col">
+                <div class="h-[200px] md:h-[30%] shrink-0 mt-3 flex flex-col pb-2 md:pb-0">
                   <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider mb-2">Terminal Logs</h2>
                   <div class="flex-1 relative overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e] p-2">
                     <div ref={terminalRef} class="absolute inset-0 p-1"></div>
+                  </div>
+                  {/* Scroll buttons for mobile */}
+                  <div class="flex md:hidden mt-2 gap-2">
+                    <button
+                      onContextMenu={(e) => e.preventDefault()}
+                      class="term-scroll-btn flex-1 flex items-center justify-center py-1 bg-transparent rounded-lg text-[#a1a1aa] transition-colors"
+                      onMouseDown={() => {
+                        if (!termInstance) return;
+                        termInstance.scrollLines(-5);
+                        const iv = setInterval(() => termInstance.scrollLines(-5), 80);
+                        const stop = () => { clearInterval(iv); document.removeEventListener('mouseup', stop); document.removeEventListener('mouseleave', stop); };
+                        document.addEventListener('mouseup', stop);
+                        document.addEventListener('mouseleave', stop);
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (!termInstance) return;
+                        termInstance.scrollLines(-5);
+                        const iv = setInterval(() => termInstance.scrollLines(-5), 80);
+                        const stop = () => { clearInterval(iv); document.removeEventListener('touchend', stop); document.removeEventListener('touchcancel', stop); };
+                        document.addEventListener('touchend', stop);
+                        document.addEventListener('touchcancel', stop);
+                      }}
+                    >
+                      <Icon name="keyboard-arrow-up" size={22} />
+                    </button>
+                    <button
+                      onContextMenu={(e) => e.preventDefault()}
+                      class="term-scroll-btn flex-1 flex items-center justify-center py-1 bg-transparent rounded-lg text-[#a1a1aa] transition-colors"
+                      onMouseDown={() => {
+                        if (!termInstance) return;
+                        termInstance.scrollLines(5);
+                        const iv = setInterval(() => termInstance.scrollLines(5), 80);
+                        const stop = () => { clearInterval(iv); document.removeEventListener('mouseup', stop); document.removeEventListener('mouseleave', stop); };
+                        document.addEventListener('mouseup', stop);
+                        document.addEventListener('mouseleave', stop);
+                      }}
+                      onTouchStart={(e) => {
+                        e.preventDefault();
+                        if (!termInstance) return;
+                        termInstance.scrollLines(5);
+                        const iv = setInterval(() => termInstance.scrollLines(5), 80);
+                        const stop = () => { clearInterval(iv); document.removeEventListener('touchend', stop); document.removeEventListener('touchcancel', stop); };
+                        document.addEventListener('touchend', stop);
+                        document.addEventListener('touchcancel', stop);
+                      }}
+                    >
+                      <Icon name="keyboard-arrow-down" size={22} />
+                    </button>
                   </div>
                 </div>
 
