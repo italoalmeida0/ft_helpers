@@ -1,3 +1,6 @@
+// Import WASI implementation
+importScripts('wasi_defs.js', 'debug.js', 'fd.js', 'wasi.js');
+
 const ESUCCESS = 0;
 
 const _textDecoder = new TextDecoder();
@@ -531,11 +534,110 @@ class App {
   }
 
   clock_time_get(clock_id, precision, time_out) {
-    throw new NotImplemented('wasi_unstable', 'clock_time_get');
+    this.mem.check();
+    const buffer = new DataView(this.mem.buffer);
+    if (clock_id === 0) { // CLOCKID_REALTIME
+      buffer.setBigUint64(time_out, BigInt(new Date().getTime()) * 1_000_000n, true);
+    } else if (clock_id === 1) { // CLOCKID_MONOTONIC
+      let monotonic_time;
+      try {
+        monotonic_time = BigInt(Math.round(performance.now() * 1000000));
+      } catch {
+        monotonic_time = 0n;
+      }
+      buffer.setBigUint64(time_out, monotonic_time, true);
+    } else {
+      buffer.setBigUint64(time_out, 0n, true);
+    }
+    return ESUCCESS;
   }
 
   poll_oneoff(in_ptr, out_ptr, nsubscriptions, nevents_out) {
-    throw new NotImplemented('wasi_unstable', 'poll_oneoff');
+    // Minimal implementation: support single clock subscription for wasi-libc clock_nanosleep
+    if (nsubscriptions === 0) return ESUCCESS;
+
+    this.mem.check();
+    const buffer = new DataView(this.mem.buffer);
+
+    // Read subscription
+    const userdata = buffer.getBigUint64(in_ptr, true);
+    const eventtype = buffer.getUint8(in_ptr + 8);
+
+    if (eventtype === 0) { // EVENTTYPE_CLOCK
+      const clockid = buffer.getUint32(in_ptr + 16, true);
+      const timeout = buffer.getBigUint64(in_ptr + 24, true);
+      const flags = buffer.getUint16(in_ptr + 32, true);
+
+      let getNow;
+      if (clockid === 1) { // CLOCKID_MONOTONIC
+        getNow = () => BigInt(Math.round(performance.now() * 1_000_000));
+      } else if (clockid === 0) { // CLOCKID_REALTIME
+        getNow = () => BigInt(new Date().getTime()) * 1_000_000n;
+      } else {
+        return 28; // ERRNO_INVAL
+      }
+
+      const endTime = (flags & 1) ? timeout : getNow() + timeout; // SUBCLOCKFLAGS_SUBSCRIPTION_CLOCK_ABSTIME
+      while (endTime > getNow()) {
+        // block until the timeout is reached
+      }
+
+      // Write event
+      buffer.setBigUint64(out_ptr, userdata, true);
+      buffer.setUint16(out_ptr + 8, 0, true); // ERRNO_SUCCESS
+      buffer.setUint8(out_ptr + 10, eventtype);
+    }
+
+    if (nevents_out) {
+      this.mem.write32(nevents_out, 1);
+    }
+    return ESUCCESS;
+  }
+}
+
+// ==========================================
+// WASIApp - Full WASI implementation for user programs
+// Uses the WASI class with proper Fd-based file descriptors
+// ==========================================
+class WASIApp {
+  constructor(module, memfs, name, ...args) {
+    this.argv = [name, ...args];
+    this.environ = ['USER=alice'];
+    this.memfs = memfs;
+
+    // Build the file descriptor table
+    // fd 0 = stdin, fd 1 = stdout, fd 2 = stderr, fd 3 = preopened root directory
+    const rootInode = new Inode('/', FILETYPE_DIRECTORY, null);
+    const rootDir = new DirectoryFd('/', rootInode);
+    const fds = [
+      new StdinFd(memfs.stdinPipe, memfs.stdinStr),
+      new OutputFd((str) => memfs.hostWrite(str)),
+      new OutputFd((str) => memfs.hostWrite(str)),
+      rootDir,
+    ];
+
+    // Create the WASI instance
+    this.wasi = new WASI(this.argv, this.environ, fds);
+
+    // Provide both wasi_snapshot_preview1 and wasi_unstable namespaces
+    const importObject = {
+      wasi_snapshot_preview1: this.wasi.wasiImport,
+      wasi_unstable: this.wasi.wasiImport,
+    };
+
+    this.ready = WebAssembly.instantiate(module, importObject).then(instance => {
+      this.instance = instance;
+      this.exports = instance.exports;
+    });
+  }
+
+  async run() {
+    await this.ready;
+    const code = this.wasi.start(this.instance);
+    if (code !== 0) {
+      throw new ProcExit(code);
+    }
+    return code;
   }
 }
 
@@ -667,13 +769,14 @@ class API {
     const stackSize = 1024 * 1024;
     const libdir = 'lib/wasm32-wasi';
     const crt1 = `${libdir}/crt1.o`;
+    const compilerRtLib = 'lib/clang/8.0.1/lib/wasi/libclang_rt.builtins-wasm32.a';
     await this.ready;
     const lld = await this.getModule(this.lldFilename);
     return await this.run(
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
-      '-lc++', '-lc++abi', '-o', wasm
+      '-lc++', '-lc++abi', compilerRtLib, '-o', wasm
     );
   }
 
@@ -685,6 +788,22 @@ class API {
     await app.run();
     const end = +new Date();
     //this.hostWrite('\n');
+    if (this.showTiming) {
+      const green = '\x1b[92m';
+      const normal = '\x1b[0m';
+      let msg = `${green}(${msToSec(start, instantiate)}s`;
+      msg += `/${msToSec(instantiate, end)}s)${normal}\n`;
+      this.hostWrite(msg);
+    }
+  }
+
+  // Run a user-compiled WASM program with full WASI support
+  async runWASI(module, ...args) {
+    const start = +new Date();
+    const app = new WASIApp(module, this.memfs, ...args);
+    const instantiate = +new Date();
+    await app.run();
+    const end = +new Date();
     if (this.showTiming) {
       const green = '\x1b[92m';
       const normal = '\x1b[0m';
@@ -789,7 +908,7 @@ const onAnyMessage = async event => {
             originalMemfsWrite(s);
           };
 
-          await api.run(wasmMod, 'a.out', ...args);
+          await api.runWASI(wasmMod, 'a.out', ...args);
 
           api.memfs.hostWrite = originalMemfsWrite;
           output = runtimeOutput.join('');
