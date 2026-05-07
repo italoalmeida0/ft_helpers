@@ -1,3 +1,6 @@
+// Import WASI implementation
+importScripts('wasi_defs.js', 'debug.js', 'fd.js', 'wasi.js');
+
 const ESUCCESS = 0;
 
 const _textDecoder = new TextDecoder();
@@ -91,6 +94,183 @@ class Memory {
   }
 }
 
+// ==========================================
+// STDIN PIPE - SharedArrayBuffer-based
+// interactive stdin for WASI programs
+// ==========================================
+//
+// SAB layout (1024 bytes total):
+//   [0..3]   (4 bytes)  - STATE: 0=IDLE, 1=DATA_READY, 2=ACK, 3=EOF, 4=CANCEL
+//   [4..7]   (4 bytes)  - LEN: number of data bytes
+//   [8..1023] (1016 bytes) - DATA buffer
+//
+// Protocol (worker reads stdin):
+//   1. Worker spins on STATE until != IDLE
+//   2. If STATE == DATA_READY: read LEN bytes from DATA, set STATE = ACK
+//   3. If STATE == EOF: return 0 bytes read (EOF)
+//   4. If STATE == CANCEL: throw error (program terminated)
+//
+// Protocol (main thread writes stdin):
+//   1. Wait until STATE == IDLE or STATE == ACK
+//   2. Write data to DATA, set LEN, set STATE = DATA_READY
+//   3. Wait for STATE == ACK (worker consumed data)
+//   4. Set STATE = IDLE
+//   5. Repeat or set STATE = EOF when done
+//
+
+const STDIN_SAB_SIZE = 1024;
+const STDIN_STATE_OFFSET = 0;
+const STDIN_LEN_OFFSET = 4;
+const STDIN_DATA_OFFSET = 8;
+const STDIN_DATA_CAPACITY = STDIN_SAB_SIZE - STDIN_DATA_OFFSET;
+
+const STDIN_STATE_IDLE = 0;
+const STDIN_STATE_DATA_READY = 1;
+const STDIN_STATE_ACK = 2;
+const STDIN_STATE_EOF = 3;
+const STDIN_STATE_CANCEL = 4;
+
+class StdinPipe {
+  constructor(sab) {
+    this.sab = sab;
+    this.int32 = new Int32Array(sab);
+    this.u8 = new Uint8Array(sab);
+  }
+
+  // Called from worker thread: read bytes into a string
+  // Returns empty string on EOF, throws on cancel
+  readSync() {
+    // Spin until data is available
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_DATA_READY) break;
+      if (state === STDIN_STATE_EOF) return '';
+      if (state === STDIN_STATE_CANCEL) throw new Error('Program terminated by user');
+      // IDLE or ACK - wait briefly then retry
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 50);
+    }
+
+    const len = Atomics.load(this.int32, STDIN_LEN_OFFSET / 4);
+    // Must copy into a non-shared Uint8Array because TextDecoder.decode()
+    // rejects views backed by SharedArrayBuffer
+    const copy = new Uint8Array(this.u8.subarray(STDIN_DATA_OFFSET, STDIN_DATA_OFFSET + len));
+    const str = _textDecoder.decode(copy);
+
+    // Acknowledge
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_ACK);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+
+    return str;
+  }
+
+  // Check if EOF has been signaled
+  isEOF() {
+    return Atomics.load(this.int32, STDIN_STATE_OFFSET / 4) === STDIN_STATE_EOF;
+  }
+
+  // Cancel any pending read (called from main thread)
+  cancel() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_CANCEL);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Signal EOF (called from main thread)
+  signalEOF() {
+    // Wait until worker is idle
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+      if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+    }
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Reset pipe to idle state
+  reset() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, 0);
+  }
+}
+
+class StdinPipeWriter {
+  constructor(sab) {
+    this.sab = sab;
+    this.int32 = new Int32Array(sab);
+    this.u8 = new Uint8Array(sab);
+  }
+
+  // Write a string to the pipe (called from main thread)
+  write(str) {
+    if (!str || str.length === 0) return;
+
+    // Encode the entire string to UTF-8 bytes first
+    const bytes = _textEncoder.encode(str);
+    let offset = 0;
+
+    while (offset < bytes.length) {
+      // Wait until worker is ready for data
+      while (true) {
+        const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+        if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+        if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+        // DATA_READY - worker hasn't consumed yet, wait
+        Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+      }
+
+      // Write chunk
+      const remaining = bytes.length - offset;
+      const chunkLen = Math.min(remaining, STDIN_DATA_CAPACITY);
+
+      for (let i = 0; i < chunkLen; i++) {
+        this.u8[STDIN_DATA_OFFSET + i] = bytes[offset + i];
+      }
+      offset += chunkLen;
+
+      Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, chunkLen);
+      Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_DATA_READY);
+      Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+
+      // Wait for ACK
+      while (true) {
+        const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+        if (state === STDIN_STATE_ACK) break;
+        if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+        Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+      }
+
+      // Reset to IDLE
+      Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    }
+  }
+
+  // Signal EOF to the worker
+  writeEOF() {
+    // Wait until worker is idle
+    while (true) {
+      const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+      if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+      if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+      Atomics.wait(this.int32, STDIN_STATE_OFFSET / 4, state, 10);
+    }
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Cancel any pending read
+  cancel() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_CANCEL);
+    Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+  }
+
+  // Reset pipe to idle state
+  reset() {
+    Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+    Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, 0);
+  }
+}
+
 class MemFS {
   constructor(options) {
     const compileStreaming = options.compileStreaming;
@@ -98,6 +278,7 @@ class MemFS {
     this.stdinStr = options.stdinStr || '';
     this.stdinStrPos = 0;
     this.memfsFilename = options.memfsFilename;
+    this.stdinPipe = null; // Will be set for interactive mode
 
     this.hostMem_ = null;
 
@@ -117,6 +298,7 @@ class MemFS {
 
   set hostMem(mem) { this.hostMem_ = mem; }
   setStdinStr(str) { this.stdinStr = str; this.stdinStrPos = 0; }
+  setStdinPipe(pipe) { this.stdinPipe = pipe; }
 
   addDirectory(path) {
     this.mem.check();
@@ -170,6 +352,13 @@ class MemFS {
     this.hostMem_.check();
     assert(fd === 0);
 
+    // Hybrid stdin approach:
+    // 1. First consume any pre-supplied stdin string (from textarea)
+    // 2. Once exhausted, use StdinPipe for interactive input (blocks until data available)
+    // This ensures pre-supplied input is available immediately for scanf,
+    // and interactive terminal input works after the pre-supplied data is consumed.
+
+    // Phase 1: Read from pre-supplied stdin string first
     // Use UTF-8 byte encoding for stdin data to match WASI expectations
     if (this.stdinStr && this.stdinStrPos < this.stdinStr.length) {
       // Encode the remaining stdin string to UTF-8 bytes
@@ -191,6 +380,7 @@ class MemFS {
         if (lenToWrite !== len) break;
       }
       // Advance stdinStrPos by the number of characters that were fully consumed
+      // We need to figure out how many characters the consumed bytes represent
       const consumedBytes = byteOffset;
       const consumedStr = _textDecoder.decode(stdinBytes.subarray(0, consumedBytes));
       this.stdinStrPos += consumedStr.length;
@@ -198,6 +388,32 @@ class MemFS {
       return ESUCCESS;
     }
 
+    // Phase 2: Pre-supplied stdin exhausted — use interactive StdinPipe
+    if (this.stdinPipe) {
+      let totalSize = 0;
+      for (let i = 0; i < iovs_len; ++i) {
+        const buf = this.hostMem_.read32(iovs);
+        iovs += 4;
+        const len = this.hostMem_.read32(iovs);
+        iovs += 4;
+
+        if (totalSize > 0) break; // Only read into first buffer for simplicity
+
+        // Read from pipe (blocks until data available)
+        const data = this.stdinPipe.readSync();
+        if (data.length === 0) break; // EOF
+
+        // Encode the string data to UTF-8 bytes and write to WASM memory
+        const dataBytes = _textEncoder.encode(data);
+        const lenToWrite = Math.min(len, dataBytes.length);
+        this.hostMem_.write(buf, dataBytes.subarray(0, lenToWrite));
+        totalSize += lenToWrite;
+      }
+      this.hostMem_.write32(nread, totalSize);
+      return ESUCCESS;
+    }
+
+    // Phase 3: No pipe, no more string data — return 0 (EOF)
     this.hostMem_.write32(nread, 0);
     return ESUCCESS;
   }
@@ -254,8 +470,12 @@ class App {
         if (exn.code === 0) return false;
         throw exn;
       }
-      let msg = `\x1b[91mError: ${exn.message}\n${exn.stack}\x1b[0m\n`;
-      this.memfs.hostWrite(msg);
+      // Provide clean error messages for common WASM runtime errors
+      if (exn instanceof WebAssembly.RuntimeError && exn.message.includes('unreachable')) {
+        this.memfs.hostWrite(`\x1b[91mRuntime error: unreachable (abort() or assert() failed)\x1b[0m\n`);
+      } else {
+        this.memfs.hostWrite(`\x1b[91mError: ${exn.message}\x1b[0m\n`);
+      }
       throw exn;
     }
     return false;
@@ -312,17 +532,125 @@ class App {
 
   random_get(buf, buf_len) {
     const data = new Uint8Array(this.mem.buffer, buf, buf_len);
-    for (let i = 0; i < buf_len; ++i) {
-      data[i] = (Math.random() * 256) | 0;
+    const tmp = new Uint8Array(buf_len);
+    for (let i = 0; i < buf_len; i += 65536) {
+      crypto.getRandomValues(tmp.subarray(i, Math.min(i + 65536, buf_len)));
     }
+    data.set(tmp);
   }
 
   clock_time_get(clock_id, precision, time_out) {
-    throw new NotImplemented('wasi_unstable', 'clock_time_get');
+    this.mem.check();
+    const buffer = new DataView(this.mem.buffer);
+    if (clock_id === 0) { // CLOCKID_REALTIME
+      buffer.setBigUint64(time_out, BigInt(new Date().getTime()) * 1_000_000n, true);
+    } else if (clock_id === 1 || clock_id === 2 || clock_id === 3) {
+      // CLOCKID_MONOTONIC (1), CLOCKID_PROCESS_CPUTIME_ID (2),
+      // CLOCKID_THREAD_CPUTIME_ID (3) — all fall back to monotonic
+      // since browsers can't measure per-process/per-thread CPU time.
+      let monotonic_time;
+      try {
+        monotonic_time = BigInt(Math.round(performance.now() * 1000000));
+      } catch {
+        monotonic_time = 0n;
+      }
+      buffer.setBigUint64(time_out, monotonic_time, true);
+    } else {
+      buffer.setBigUint64(time_out, 0n, true);
+    }
+    return ESUCCESS;
   }
 
   poll_oneoff(in_ptr, out_ptr, nsubscriptions, nevents_out) {
-    throw new NotImplemented('wasi_unstable', 'poll_oneoff');
+    // Minimal implementation: support single clock subscription for wasi-libc clock_nanosleep
+    if (nsubscriptions === 0) return ESUCCESS;
+
+    this.mem.check();
+    const buffer = new DataView(this.mem.buffer);
+
+    // Read subscription
+    const userdata = buffer.getBigUint64(in_ptr, true);
+    const eventtype = buffer.getUint8(in_ptr + 8);
+
+    if (eventtype === 0) { // EVENTTYPE_CLOCK
+      const clockid = buffer.getUint32(in_ptr + 16, true);
+      const timeout = buffer.getBigUint64(in_ptr + 24, true);
+      const flags = buffer.getUint16(in_ptr + 32, true);
+
+      let getNow;
+      if (clockid === 1 || clockid === 2 || clockid === 3) { // CLOCKID_MONOTONIC, PROCESS, THREAD
+        getNow = () => BigInt(Math.round(performance.now() * 1_000_000));
+      } else if (clockid === 0) { // CLOCKID_REALTIME
+        getNow = () => BigInt(new Date().getTime()) * 1_000_000n;
+      } else {
+        return 28; // ERRNO_INVAL
+      }
+
+      const endTime = (flags & 1) ? timeout : getNow() + timeout; // SUBCLOCKFLAGS_SUBSCRIPTION_CLOCK_ABSTIME
+      // Use Atomics.wait with a timeout to avoid a CPU-bound busy loop
+      const waitBuf = new Int32Array(new SharedArrayBuffer(4));
+      while (endTime > getNow()) {
+        const remaining = endTime - getNow();
+        const ms = Math.max(1, Number(remaining / 1_000_000n));
+        Atomics.wait(waitBuf, 0, 0, Math.min(ms, 5000));
+      }
+
+      // Write event
+      buffer.setBigUint64(out_ptr, userdata, true);
+      buffer.setUint16(out_ptr + 8, 0, true); // ERRNO_SUCCESS
+      buffer.setUint8(out_ptr + 10, eventtype);
+    }
+
+    if (nevents_out) {
+      this.mem.write32(nevents_out, 1);
+    }
+    return ESUCCESS;
+  }
+}
+
+// ==========================================
+// WASIApp - Full WASI implementation for user programs
+// Uses the WASI class with proper Fd-based file descriptors
+// ==========================================
+class WASIApp {
+  constructor(module, memfs, name, ...args) {
+    this.argv = [name, ...args];
+    this.environ = ['USER=alice'];
+    this.memfs = memfs;
+
+    // Build the file descriptor table
+    // fd 0 = stdin, fd 1 = stdout, fd 2 = stderr, fd 3 = preopened root directory
+    const rootInode = new Inode('/', FILETYPE_DIRECTORY, null);
+    const rootDir = new DirectoryFd('/', rootInode);
+    const fds = [
+      new StdinFd(memfs.stdinPipe, memfs.stdinStr),
+      new OutputFd((str) => memfs.hostWrite(str)),
+      new OutputFd((str) => memfs.hostWrite(str)),
+      rootDir,
+    ];
+
+    // Create the WASI instance
+    this.wasi = new WASI(this.argv, this.environ, fds);
+
+    // Provide both wasi_snapshot_preview1 and wasi_unstable namespaces
+    const importObject = {
+      wasi_snapshot_preview1: this.wasi.wasiImport,
+      wasi_unstable: this.wasi.wasiImport,
+    };
+
+    this.ready = WebAssembly.instantiate(module, importObject).then(instance => {
+      this.instance = instance;
+      this.exports = instance.exports;
+    });
+  }
+
+  async run() {
+    await this.ready;
+    const code = this.wasi.start(this.instance);
+    if (code !== 0) {
+      throw new ProcExit(code);
+    }
+    return code;
   }
 }
 
@@ -454,13 +782,14 @@ class API {
     const stackSize = 1024 * 1024;
     const libdir = 'lib/wasm32-wasi';
     const crt1 = `${libdir}/crt1.o`;
+    const compilerRtLib = 'lib/clang/8.0.1/lib/wasi/libclang_rt.builtins-wasm32.a';
     await this.ready;
     const lld = await this.getModule(this.lldFilename);
     return await this.run(
       lld, 'wasm-ld', '--no-threads',
       '--export-dynamic',
       '-z', `stack-size=${stackSize}`, `-L${libdir}`, crt1, obj, '-lc',
-      '-lc++', '-lc++abi', '-o', wasm
+      '-lc++', '-lc++abi', compilerRtLib, '-o', wasm
     );
   }
 
@@ -480,11 +809,28 @@ class API {
       this.hostWrite(msg);
     }
   }
+
+  // Run a user-compiled WASM program with full WASI support
+  async runWASI(module, ...args) {
+    const start = +new Date();
+    const app = new WASIApp(module, this.memfs, ...args);
+    const instantiate = +new Date();
+    await app.run();
+    const end = +new Date();
+    if (this.showTiming) {
+      const green = '\x1b[92m';
+      const normal = '\x1b[0m';
+      let msg = `${green}(${msToSec(start, instantiate)}s`;
+      msg += `/${msToSec(instantiate, end)}s)${normal}\n`;
+      this.hostWrite(msg);
+    }
+  }
 }
 
 let api = null;
 let port = null;
 let binaryCache = null;
+let stdinPipe = null; // StdinPipe instance for interactive mode
 
 const makeApiOptions = () => ({
   readBuffer(filename) {
@@ -532,9 +878,11 @@ const onAnyMessage = async event => {
         const responseId = event.data.responseId;
         let output = '';
         let error = null;
+        let originalMemfsWrite = null;
+        let runtimeOutput = [];
 
         try {
-          const { code, args, stdin } = event.data.data || {};
+          const { code, args, stdin, stdinSAB } = event.data.data || {};
 
           await api.ready;
           api.memfs.addFile('main.c', code);
@@ -548,23 +896,71 @@ const onAnyMessage = async event => {
           const buffer = api.memfs.getFileContents('a.out');
           const wasmMod = await WebAssembly.compile(buffer);
 
-          const originalMemfsWrite = api.memfs.hostWrite;
-          const runtimeOutput = [];
+          // Set up stdin: hybrid mode — pre-supplied string + interactive pipe
+          // IMPORTANT: Set this up BEFORE wrapping hostWrite, so that
+          // the stdin pipe is ready when the program starts reading.
+          //
+          // Hybrid approach: Keep the stdin string as pre-supplied input that
+          // is consumed first (immediately available for scanf), then switch
+          // to the interactive StdinPipe for terminal input. This prevents
+          // the race condition where scanf gets EOF before the user can type.
+          if (stdinSAB) {
+            stdinPipe = new StdinPipe(stdinSAB);
+            api.memfs.setStdinPipe(stdinPipe);
+            api.memfs.setStdinStr(stdin || ''); // Pre-supplied stdin consumed first
+          } else {
+            stdinPipe = null;
+            api.memfs.setStdinPipe(null);
+            api.memfs.setStdinStr(stdin || '');
+          }
+
+          // Now wrap hostWrite for output capture
+          originalMemfsWrite = api.memfs.hostWrite;
           api.memfs.hostWrite = (s) => {
             runtimeOutput.push(s);
             originalMemfsWrite(s);
           };
 
-          api.memfs.setStdinStr(stdin || '');
-          await api.run(wasmMod, 'a.out', ...args);
+          await api.runWASI(wasmMod, 'a.out', ...args);
 
           api.memfs.hostWrite = originalMemfsWrite;
           output = runtimeOutput.join('');
         } catch (err) {
-          error = err.message || String(err);
+          // If the error is from user cancellation, don't treat as error
+          if (err.message === 'Program terminated by user') {
+            // Normal termination, not an error
+          } else if (err.message === 'unreachable' || (err instanceof WebAssembly.RuntimeError && err.message.includes('unreachable'))) {
+            // WASM "unreachable" instruction — typically from assert()/abort() in C code
+            error = 'Runtime error: unreachable (program called abort() or assert() failed)';
+          } else {
+            error = err.message || String(err);
+          }
+          if (originalMemfsWrite) {
+            api.memfs.hostWrite = originalMemfsWrite;
+          }
+          output = runtimeOutput ? runtimeOutput.join('') : '';
+        } finally {
+          stdinPipe = null;
+          api.memfs.setStdinPipe(null);
         }
 
         port.postMessage({ id: 'runAsync', responseId, data: { output, error } });
+        break;
+      }
+
+      case 'cancelRun': {
+        // Cancel any pending stdin read
+        if (stdinPipe) {
+          stdinPipe.cancel();
+        }
+        break;
+      }
+
+      case 'stdinEOF': {
+        // Signal EOF to the stdin pipe
+        if (stdinPipe) {
+          stdinPipe.signalEOF();
+        }
         break;
       }
     }

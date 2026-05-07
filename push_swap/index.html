@@ -9,6 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 
+    <script src="coi-serviceworker.js"></script>
+
     <!-- Tailwind CSS v4 -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     
@@ -16,23 +18,24 @@
     <link rel="stylesheet" href="../xterm-6.0.0.css" />
 
     <!-- Import Map including CodeMirror 6 -->
-    <script type="importmap">
+        <script type="importmap">
       {
         "imports": {
           "solid-js": "https://esm.sh/solid-js@1.9.12",
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
-          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
+          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.4",
           "@xterm/xterm": "https://esm.sh/@xterm/xterm@6.0.0",
           "@xterm/addon-fit": "https://esm.sh/@xterm/addon-fit@0.11.0",
           "@xterm/addon-webgl": "https://esm.sh/@xterm/addon-webgl@0.19.0",
           "@xterm/addon-unicode-graphemes": "https://esm.sh/@xterm/addon-unicode-graphemes@0.4.0",
           "codemirror": "https://esm.sh/codemirror@6.0.2",
-          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.0",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.1",
           "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
           "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
           "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
           "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
+          "@replit/codemirror-vscode-keymap": "https://esm.sh/@replit/codemirror-vscode-keymap@6.0.2",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
@@ -78,12 +81,12 @@
         height: var(--fullh);
       }
       
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #52525b; }
 
-      button { cursor: pointer; }
+      button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
       .stack-item { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
@@ -104,6 +107,11 @@
         font-size: 14px;
         overflow: auto;
       }
+      
+      /* Mobile optimizations for CodeMirror */
+      @media (max-width: 768px) {
+        .cm-scroller { font-size: 13px; }
+      }
 
       .spinner {
         border: 2px solid rgba(255,255,255,0.1);
@@ -117,9 +125,9 @@
       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       
       /* xterm.js custom scrollbar integration fix */
-      .xterm-viewport::-webkit-scrollbar { width: 8px; }
+      .xterm-viewport::-webkit-scrollbar { width: 6px; }
       .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
-      .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+      .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
 
       /* Terminal scroll buttons */
       .term-scroll-btn {
@@ -131,40 +139,159 @@
       .term-scroll-btn:active {
         background-color: #3f3f46 !important;
       }
+
+      /* Interactive mode cursor indicator */
+      .xterm.interactive-mode .xterm-cursor {
+        outline: 1px solid rgba(59, 130, 246, 0.5) !important;
+      }
     </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
     <script>
       const url = new URL(window.location.href);
       if (!url.pathname.endsWith('/')) 
-        window.location.replace(`${url.origin}${url.pathname}/${url.hash ? url.hash : ''}`)
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          for (const reg of regs) {
-            console.log('Unregistering service worker:', reg.scope);
-            reg.unregister();
-          }
-        });
-      }
+        window.location.replace(`${url.origin}${url.pathname}/${url.hash ? url.hash : ''}`);
     </script>
     <div id="root" class="h-full relative"></div>
 
     <script type="text/babel" data-type="module" data-presets="solid">
-      import { createSignal, createMemo, For, Show, onMount } from "solid-js";
+      import { createSignal, createMemo, For, Show, onMount, onCleanup } from "solid-js";
       import { render } from "solid-js/web";
       import { Terminal } from "@xterm/xterm";
       import { FitAddon } from "@xterm/addon-fit";
-      import { WebglAddon } from "@xterm/addon-webgl";
       import { UnicodeGraphemesAddon } from "@xterm/addon-unicode-graphemes";
+      import { WebglAddon } from "@xterm/addon-webgl";
 
       // CodeMirror 6 Imports
-      import { keymap } from "@codemirror/view";
-      import { basicSetup, EditorView  } from "codemirror";
+      import { keymap, EditorView } from "@codemirror/view";
+      import { basicSetup } from "codemirror";
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
       import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+      import { vscodeKeymap } from '@replit/codemirror-vscode-keymap';
       import { indentWithTab } from "@codemirror/commands";
       import { Prec } from '@codemirror/state';
+
+      // ==========================================
+      // STDIN PIPE CONSTANTS (must match worker)
+      // ==========================================
+      const STDIN_SAB_SIZE = 1024;
+      const STDIN_STATE_OFFSET = 0;
+      const STDIN_LEN_OFFSET = 4;
+      const STDIN_DATA_OFFSET = 8;
+      const STDIN_DATA_CAPACITY = STDIN_SAB_SIZE - STDIN_DATA_OFFSET;
+
+      const STDIN_STATE_IDLE = 0;
+      const STDIN_STATE_DATA_READY = 1;
+      const STDIN_STATE_ACK = 2;
+      const STDIN_STATE_EOF = 3;
+      const STDIN_STATE_CANCEL = 4;
+
+      // ==========================================
+      // STDIN PIPE WRITER (main thread side)
+      // Uses polling (no Atomics.wait on main thread)
+      // ==========================================
+      class StdinPipeWriter {
+        constructor(sab) {
+          this.sab = sab;
+          this.int32 = new Int32Array(sab);
+          this.u8 = new Uint8Array(sab);
+          this._writeQueue = [];
+          this._writing = false;
+        }
+
+        // Async write — enqueues data and processes it
+        async write(str) {
+          if (!str || str.length === 0) return;
+          this._writeQueue.push(str);
+          if (this._writing) return; // Already processing queue
+          this._writing = true;
+          try {
+            while (this._writeQueue.length > 0) {
+              const chunk = this._writeQueue.shift();
+              await this._writeChunk(chunk);
+            }
+          } finally {
+            this._writing = false;
+          }
+        }
+
+        async _writeChunk(str) {
+          // Encode the string to UTF-8 bytes first
+          const encoder = new TextEncoder();
+          const bytes = encoder.encode(str);
+          let offset = 0;
+
+          while (offset < bytes.length) {
+            // Wait until worker is ready for data
+            while (true) {
+              const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+              if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+              await new Promise(r => setTimeout(r, 2));
+            }
+
+            // Write chunk
+            const remaining = bytes.length - offset;
+            const chunkLen = Math.min(remaining, STDIN_DATA_CAPACITY);
+
+            for (let i = 0; i < chunkLen; i++) {
+              this.u8[STDIN_DATA_OFFSET + i] = bytes[offset + i];
+            }
+            offset += chunkLen;
+
+            Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, chunkLen);
+            Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_DATA_READY);
+            Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+
+            // Wait for ACK
+            while (true) {
+              const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+              if (state === STDIN_STATE_ACK) break;
+              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+              await new Promise(r => setTimeout(r, 2));
+            }
+
+            // Reset to IDLE
+            Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+          }
+        }
+
+        async writeEOF() {
+          while (true) {
+            const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
+            if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
+            if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
+            await new Promise(r => setTimeout(r, 2));
+          }
+          Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
+          Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+        }
+
+        cancel() {
+          Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_CANCEL);
+          Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
+        }
+
+        reset() {
+          this._writeQueue = [];
+          this._writing = false;
+          Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_IDLE);
+          Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, 0);
+        }
+      }
+
+      // ==========================================
+      // CHECK SharedArrayBuffer AVAILABILITY
+      // ==========================================
+      function isSABAvailable() {
+        try {
+          new SharedArrayBuffer(16);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
 
       // ==========================================
       // WORKER API
@@ -174,30 +301,55 @@
           this.nextResponseId = 0;
           this.responseCBs = new Map();
           this.onWrite = onWrite;
+          this.binaries = binaries;
+          this._initWorker();
+        }
+
+        _initWorker() {
           this.worker = new Worker('compiler-worker.js');
           const channel = new MessageChannel();
           this.port = channel.port1;
           this.port.onmessage = this.onmessage.bind(this);
 
           const remotePort = channel.port2;
-          this.worker.postMessage({ id: 'constructor', data: { port: remotePort, binaries } }, [remotePort]);
+          this.worker.postMessage({ id: 'constructor', data: { port: remotePort, binaries: this.binaries } }, [remotePort]);
         }
 
         terminate() {
           this.worker.terminate();
         }
 
-        async runAsync(id, options) {
+        // Force-terminate a stuck worker (e.g., infinite loop) and recreate it.
+        forceRestart() {
+          this.worker.terminate();
+          this.responseCBs.clear();
+          this._initWorker();
+        }
+
+        async runAsync(id, options, transferables) {
           const responseId = this.nextResponseId++;
           const responsePromise = new Promise((resolve, reject) => {
             this.responseCBs.set(responseId, { resolve, reject });
           });
-          this.port.postMessage({ id, responseId, data: options });
+          this.port.postMessage({ id, responseId, data: options }, transferables || []);
           return await responsePromise;
         }
 
-        async compileAndRun(code, args) {
-          return this.runAsync('compileAndRun', { code, args });
+        async compileAndRun(code, args, stdin, stdinSAB) {
+          const data = { code, args, stdin };
+          if (stdinSAB) {
+            data.stdinSAB = stdinSAB;
+            return this.runAsync('compileAndRun', data);
+          }
+          return this.runAsync('compileAndRun', data);
+        }
+
+        cancelRun() {
+          this.port.postMessage({ id: 'cancelRun' });
+        }
+
+        stdinEOF() {
+          this.port.postMessage({ id: 'stdinEOF' });
         }
 
         onmessage(event) {
@@ -355,6 +507,8 @@
         const [appState, setAppState] = createSignal("IDLE");
         const [statusMessage, setStatusMessage] = createSignal("");
         const [executionError, setExecutionError] = createSignal(null);
+        const [sabAvailable] = createSignal(isSABAvailable());
+        const [compilerReady, setCompilerReady] = createSignal(false);
         
         let codeEditorRef;
         let cmInstance;
@@ -365,6 +519,9 @@
         let termInstance;
         let fitAddon;
         let compilerApi;
+        let stdinSAB = null;
+        let stdinPipeWriter = null;
+        let terminalDataDisposable = null;
 
         const defaultCode = `// 42 push_swap
 // ----------------------------
@@ -462,6 +619,78 @@ int main(int argc, char **argv) {
         };
         
         const [scriptCode, setScriptCode] = createSignal(loadSavedCode());
+        const [stdinInput, setStdinInput] = createSignal("");
+
+        // Line buffer for canonical (cooked) mode editing
+        let _lineBuffer = '';
+
+        // Handle terminal input during interactive mode
+        // Implements canonical mode: line editing (backspace) + send on Enter
+        const handleTerminalData = (data) => {
+          if (appState() !== "RUNNING" || !stdinPipeWriter) return;
+
+          for (let i = 0; i < data.length; i++) {
+            const code = data.charCodeAt(i);
+
+            // Ctrl+C (0x03) - terminate program
+            if (code === 3) {
+              termInstance.writeln("^C");
+              _lineBuffer = '';
+              stopProgram();
+              return;
+            }
+
+            // Ctrl+D (0x04) - send EOF
+            if (code === 4) {
+              termInstance.writeln("^D");
+              _lineBuffer = '';
+              stdinPipeWriter.writeEOF().catch(() => {});
+              return;
+            }
+
+            // Ctrl+U (0x15) - kill line (erase entire line)
+            if (code === 0x15) {
+              if (_lineBuffer.length > 0) {
+                termInstance.write('\b \b'.repeat(_lineBuffer.length));
+                _lineBuffer = '';
+              }
+              continue;
+            }
+
+            // Ctrl+W (0x17) - delete word backwards
+            if (code === 0x17) {
+              let trimmed = _lineBuffer.replace(/\s+$/, '');
+              const deleteCount = _lineBuffer.length - trimmed.length + (trimmed.match(/\s\S*$/) ? trimmed.match(/\s\S*$/)[0].length : trimmed.length);
+              if (deleteCount > 0) {
+                termInstance.write('\b \b'.repeat(deleteCount));
+                _lineBuffer = _lineBuffer.substring(0, _lineBuffer.length - deleteCount);
+              }
+              continue;
+            }
+
+            // Backspace (0x7F) or DEL (0x08) - delete last character
+            if (code === 0x7F || code === 0x08) {
+              if (_lineBuffer.length > 0) {
+                _lineBuffer = [..._lineBuffer].slice(0, -1).join('');
+                termInstance.write('\b \b');
+              }
+              continue;
+            }
+
+            // Enter / Return (0x0D) - flush line buffer to program
+            if (code === 0x0D) {
+              const line = _lineBuffer + '\n';
+              _lineBuffer = '';
+              termInstance.write('\r\n');
+              stdinPipeWriter.write(line).catch(() => {});
+              continue;
+            }
+
+            // Regular printable character - add to line buffer and echo
+            _lineBuffer += data[i];
+            termInstance.write(data[i]);
+          }
+        };
 
         // --- VALIDATION & BENCHMARK LOGIC ---
         const isSorted = createMemo(() => {
@@ -528,7 +757,7 @@ int main(int argc, char **argv) {
               doc: scriptCode(),
               extensions: [
                 basicSetup,
-                keymap.of([indentWithTab]),
+                keymap.of([...vscodeKeymap, indentWithTab]),
                 indentationMarkers(),
                 cpp(),
                 vscodeDark,
@@ -562,12 +791,13 @@ int main(int argc, char **argv) {
 
           // Initialize xterm.js
           termInstance = new Terminal({
-            theme: { background: '#1e1e1e', foreground: '#d4d4d8' },
+            theme: { background: '#09090b', foreground: '#d4d4d8' },
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 13,
             cursorBlink: true,
+            convertEol: true,
             allowProposedApi: true,
-            convertEol: true
+            scrollback: 5000,
           });
           fitAddon = new FitAddon();
           termInstance.loadAddon(fitAddon);
@@ -576,13 +806,14 @@ int main(int argc, char **argv) {
 
           if (terminalRef) {
             termInstance.open(terminalRef);
-            fitAddon.fit();
+            requestAnimationFrame(() => {
+              try { fitAddon.fit(); } catch(e) {}
+            });
             
             const resizeObserver = new ResizeObserver(() => {
               try { fitAddon.fit(); } catch(e) {}
             });
             resizeObserver.observe(terminalRef);
-            
           }
 
           termInstance.writeln("\x1b[33mLoading compiler...\x1b[0m\n");
@@ -592,12 +823,47 @@ int main(int argc, char **argv) {
               if (termInstance) termInstance.write(data);
             }, binaries);
             termInstance.clear();
-            termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m\n");
+            termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m");
+            setCompilerReady(true);
           } catch (err) {
             termInstance.clear();
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
           }
         });
+
+        onCleanup(() => {
+          if (compilerApi) compilerApi.terminate();
+          if (terminalDataDisposable) terminalDataDisposable.dispose();
+        });
+
+        const stopProgram = () => {
+          if (appState() !== "RUNNING" && appState() !== "COMPILING") return;
+          
+          // First try graceful cancellation via stdin pipe
+          if (stdinPipeWriter) {
+            stdinPipeWriter.cancel();
+          }
+          compilerApi.cancelRun();
+
+          // For CPU-bound infinite loops (e.g., while(1)), cancelRun() won't
+          // work because the WASM code never reads stdin. We need to force-
+          // terminate the worker and recreate it.
+          compilerApi.forceRestart();
+
+          // Clean up state since the pending compileAndRun promise will never resolve
+          if (terminalDataDisposable) {
+            terminalDataDisposable.dispose();
+            terminalDataDisposable = null;
+          }
+          stdinPipeWriter = null;
+          stdinSAB = null;
+
+          setAppState("IDLE");
+          setStatusMessage("");
+          if (termInstance) {
+            termInstance.writeln("\n\x1b[33mProgram stopped by user.\x1b[0m");
+          }
+        };
 
         const applyOpState = (op, currentA, currentB) => {
           let a = [...currentA];
@@ -678,18 +944,43 @@ int main(int argc, char **argv) {
             return;
           }
 
-          if (appState() === "COMPILING") return;
+          if (appState() === "COMPILING" || appState() === "RUNNING") return;
+          if (!compilerReady()) return;
 
           setAppState("COMPILING");
           setExecutionError(null);
           termInstance.clear();
 
+          // Detach any previous terminal input listener
+          if (terminalDataDisposable) {
+            terminalDataDisposable.dispose();
+            terminalDataDisposable = null;
+          }
+
           try {
+            const stackArgs = stackA().map(String);
             setStatusMessage("Compiling...");
             termInstance.writeln("\x1b[34mCompiling and running...\x1b[0m\n");
 
-            const stackArgs = stackA().map(String);
-            const result = await compilerApi.compileAndRun(scriptCode(), stackArgs);
+            // Create SAB for interactive stdin if available
+            let sab = null;
+            if (sabAvailable()) {
+              sab = new SharedArrayBuffer(STDIN_SAB_SIZE);
+              stdinSAB = sab;
+              stdinPipeWriter = new StdinPipeWriter(sab);
+              stdinPipeWriter.reset();
+              _lineBuffer = '';
+            }
+
+            // Set up terminal input listener for interactive mode
+            if (sab) {
+              terminalDataDisposable = termInstance.onData(handleTerminalData);
+            }
+
+            setAppState("RUNNING");
+            setStatusMessage("Running...");
+
+            const result = await compilerApi.compileAndRun(scriptCode(), stackArgs, stdinInput(), sab);
 
             if (result.error) {
               throw new Error(result.error);
@@ -721,11 +1012,24 @@ int main(int argc, char **argv) {
             }
 
             setAppState("IDLE");
+            setStatusMessage("");
             termInstance.writeln(`\x1b[32m[Visualizer] Finished.\x1b[0m`);
           } catch (err) {
-            setExecutionError(err.message);
-            termInstance.writeln(`\n\x1b[31m${err.message}\x1b[0m`);
+            if (err.message !== 'Program terminated by user') {
+              setExecutionError(err.message);
+              termInstance.writeln(`\n\x1b[31m${err.message}\x1b[0m`);
+            }
+          } finally {
             setAppState("IDLE");
+            setStatusMessage("");
+
+            // Clean up terminal input listener
+            if (terminalDataDisposable) {
+              terminalDataDisposable.dispose();
+              terminalDataDisposable = null;
+            }
+            stdinPipeWriter = null;
+            stdinSAB = null;
           }
         };
 
@@ -917,10 +1221,21 @@ int main(int argc, char **argv) {
                             <span>{statusMessage()}</span>
                         </div>
                     </Show>
+
+                    <Show when={appState() === "RUNNING"}>
+                      <button
+                        onClick={stopProgram}
+                        class="flex items-center space-x-1 px-3 py-1 md:px-4 md:py-1.5 rounded-md transition-colors text-xs md:text-sm font-semibold bg-red-600 hover:bg-red-500 text-white"
+                        title="Stop Program (Ctrl+C)"
+                      >
+                        <Icon name="stop" color="ffffff" size={16} />
+                        <span>Stop</span>
+                      </button>
+                    </Show>
                     
                     <button 
                       onClick={resetToDefault}
-                      disabled={appState() === "COMPILING" || appState() === "ANIMATING"}
+                      disabled={appState() === "COMPILING" || appState() === "ANIMATING" || appState() === "RUNNING"}
                       class="flex items-center space-x-1 px-3 py-1 md:px-4 md:py-1.5 rounded-md transition-colors text-xs md:text-sm font-semibold disabled:opacity-50 bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8]"
                       title="Reset to default code"
                     >
@@ -930,11 +1245,14 @@ int main(int argc, char **argv) {
                     
                     <button 
                       onClick={runProgram}
-                      disabled={appState() === "COMPILING"}
+                      disabled={appState() === "COMPILING" || appState() === "RUNNING" || !compilerReady()}
                       class={`flex items-center space-x-1 px-3 py-1 md:px-4 md:py-1.5 rounded-md transition-colors text-xs md:text-sm font-semibold disabled:opacity-50 ${appState() === "ANIMATING" ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}
+                      title={!compilerReady() ? "Loading compiler..." : (appState() === "ANIMATING" ? "Stop Animation" : "Run")}
                     >
-                      <Icon name={appState() === "ANIMATING" ? "stop" : "play-arrow"} color="ffffff" size={16} />
-                      <span>{appState() === "ANIMATING" ? "Stop Animation" : "Compile & Run"}</span>
+                      <Show when={appState() === "COMPILING"} fallback={<Icon name={appState() === "ANIMATING" ? "stop" : "play-arrow"} color="ffffff" size={16} />}>
+                        <div class="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.2)', 'border-left-color': '#fff' }}></div>
+                      </Show>
+                      <span>{appState() === "ANIMATING" ? "Stop Animation" : "Run"}</span>
                     </button>
                   </div>
                 </div>
@@ -946,9 +1264,17 @@ int main(int argc, char **argv) {
 
                 {/* xterm.js Terminal Logs */}
                 <div class="h-[200px] md:h-[30%] shrink-0 mt-3 flex flex-col pb-2 md:pb-0">
-                  <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider mb-2">Terminal Logs</h2>
-                  <div class="flex-1 relative overflow-hidden border border-[#27272a] rounded-lg bg-[#1e1e1e] p-2">
-                    <div ref={terminalRef} class="absolute inset-0 p-1"></div>
+                  <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xs md:text-sm font-semibold text-[#52525b] uppercase tracking-wider">Terminal</h2>
+                    <Show when={appState() === "RUNNING"}>
+                      <span class="text-[10px] md:text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                        <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        Running
+                      </span>
+                    </Show>
+                  </div>
+                  <div class="flex-1 relative overflow-hidden bg-transparent">
+                    <div ref={terminalRef} class="absolute inset-0"></div>
                   </div>
                   {/* Scroll buttons for mobile */}
                   <div class="flex md:hidden mt-2 gap-2">

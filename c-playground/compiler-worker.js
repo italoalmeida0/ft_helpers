@@ -470,8 +470,12 @@ class App {
         if (exn.code === 0) return false;
         throw exn;
       }
-      let msg = `\x1b[91mError: ${exn.message}\n${exn.stack}\x1b[0m\n`;
-      this.memfs.hostWrite(msg);
+      // Provide clean error messages for common WASM runtime errors
+      if (exn instanceof WebAssembly.RuntimeError && exn.message.includes('unreachable')) {
+        this.memfs.hostWrite(`\x1b[91mRuntime error: unreachable (abort() or assert() failed)\x1b[0m\n`);
+      } else {
+        this.memfs.hostWrite(`\x1b[91mError: ${exn.message}\x1b[0m\n`);
+      }
       throw exn;
     }
     return false;
@@ -528,9 +532,11 @@ class App {
 
   random_get(buf, buf_len) {
     const data = new Uint8Array(this.mem.buffer, buf, buf_len);
-    for (let i = 0; i < buf_len; ++i) {
-      data[i] = (Math.random() * 256) | 0;
+    const tmp = new Uint8Array(buf_len);
+    for (let i = 0; i < buf_len; i += 65536) {
+      crypto.getRandomValues(tmp.subarray(i, Math.min(i + 65536, buf_len)));
     }
+    data.set(tmp);
   }
 
   clock_time_get(clock_id, precision, time_out) {
@@ -538,7 +544,10 @@ class App {
     const buffer = new DataView(this.mem.buffer);
     if (clock_id === 0) { // CLOCKID_REALTIME
       buffer.setBigUint64(time_out, BigInt(new Date().getTime()) * 1_000_000n, true);
-    } else if (clock_id === 1) { // CLOCKID_MONOTONIC
+    } else if (clock_id === 1 || clock_id === 2 || clock_id === 3) {
+      // CLOCKID_MONOTONIC (1), CLOCKID_PROCESS_CPUTIME_ID (2),
+      // CLOCKID_THREAD_CPUTIME_ID (3) — all fall back to monotonic
+      // since browsers can't measure per-process/per-thread CPU time.
       let monotonic_time;
       try {
         monotonic_time = BigInt(Math.round(performance.now() * 1000000));
@@ -569,7 +578,7 @@ class App {
       const flags = buffer.getUint16(in_ptr + 32, true);
 
       let getNow;
-      if (clockid === 1) { // CLOCKID_MONOTONIC
+      if (clockid === 1 || clockid === 2 || clockid === 3) { // CLOCKID_MONOTONIC, PROCESS, THREAD
         getNow = () => BigInt(Math.round(performance.now() * 1_000_000));
       } else if (clockid === 0) { // CLOCKID_REALTIME
         getNow = () => BigInt(new Date().getTime()) * 1_000_000n;
@@ -578,8 +587,12 @@ class App {
       }
 
       const endTime = (flags & 1) ? timeout : getNow() + timeout; // SUBCLOCKFLAGS_SUBSCRIPTION_CLOCK_ABSTIME
+      // Use Atomics.wait with a timeout to avoid a CPU-bound busy loop
+      const waitBuf = new Int32Array(new SharedArrayBuffer(4));
       while (endTime > getNow()) {
-        // block until the timeout is reached
+        const remaining = endTime - getNow();
+        const ms = Math.max(1, Number(remaining / 1_000_000n));
+        Atomics.wait(waitBuf, 0, 0, Math.min(ms, 5000));
       }
 
       // Write event
@@ -916,6 +929,9 @@ const onAnyMessage = async event => {
           // If the error is from user cancellation, don't treat as error
           if (err.message === 'Program terminated by user') {
             // Normal termination, not an error
+          } else if (err.message === 'unreachable' || (err instanceof WebAssembly.RuntimeError && err.message.includes('unreachable'))) {
+            // WASM "unreachable" instruction — typically from assert()/abort() in C code
+            error = 'Runtime error: unreachable (program called abort() or assert() failed)';
           } else {
             error = err.message || String(err);
           }

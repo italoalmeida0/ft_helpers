@@ -24,17 +24,18 @@
           "solid-js": "https://esm.sh/solid-js@1.9.12",
           "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
           "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
-          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.2",
+          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.4",
           "@xterm/xterm": "https://esm.sh/@xterm/xterm@6.0.0",
           "@xterm/addon-fit": "https://esm.sh/@xterm/addon-fit@0.11.0",
           "@xterm/addon-webgl": "https://esm.sh/@xterm/addon-webgl@0.19.0",
           "@xterm/addon-unicode-graphemes": "https://esm.sh/@xterm/addon-unicode-graphemes@0.4.0",
           "codemirror": "https://esm.sh/codemirror@6.0.2",
-          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.0",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.1",
           "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
           "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
           "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
           "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
+          "@replit/codemirror-vscode-keymap": "https://esm.sh/@replit/codemirror-vscode-keymap@6.0.2",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
@@ -155,11 +156,12 @@
       import { WebglAddon } from "@xterm/addon-webgl";
 
       // CodeMirror 6 Imports
-      import { keymap } from "@codemirror/view";
-      import { basicSetup, EditorView } from "codemirror";
+      import { keymap, EditorView } from "@codemirror/view";
+      import { basicSetup } from "codemirror";
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
       import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+      import { vscodeKeymap } from '@replit/codemirror-vscode-keymap';
       import { indentWithTab } from "@codemirror/commands";
       import { Prec } from '@codemirror/state';
 
@@ -295,17 +297,31 @@
           this.nextResponseId = 0;
           this.responseCBs = new Map();
           this.onWrite = onWrite;
+          this.binaries = binaries;
+          this._initWorker();
+        }
+
+        _initWorker() {
           this.worker = new Worker('compiler-worker.js');
           const channel = new MessageChannel();
           this.port = channel.port1;
           this.port.onmessage = this.onmessage.bind(this);
 
           const remotePort = channel.port2;
-          this.worker.postMessage({ id: 'constructor', data: { port: remotePort, binaries } }, [remotePort]);
+          this.worker.postMessage({ id: 'constructor', data: { port: remotePort, binaries: this.binaries } }, [remotePort]);
         }
 
         terminate() {
           this.worker.terminate();
+        }
+
+        // Force-terminate a stuck worker (e.g., infinite loop) and recreate it.
+        // The pending compileAndRun promise will never resolve, so callers
+        // should handle the state transition themselves before calling this.
+        forceRestart() {
+          this.worker.terminate();
+          this.responseCBs.clear();
+          this._initWorker();
         }
 
         async runAsync(id, options, transferables) {
@@ -445,6 +461,7 @@
         const [statusMessage, setStatusMessage] = createSignal("");
         const [executionError, setExecutionError] = createSignal(null);
         const [sabAvailable] = createSignal(isSABAvailable());
+        const [compilerReady, setCompilerReady] = createSignal(false);
 
         let codeEditorRef;
         let cmInstance;
@@ -562,7 +579,7 @@ int main()
             if (code === 3) {
               termInstance.writeln("^C");
               _lineBuffer = '';
-              stdinPipeWriter.cancel();
+              stopProgram();
               return;
             }
 
@@ -641,7 +658,7 @@ int main()
               doc: scriptCode(),
               extensions: [
                 basicSetup,
-                keymap.of([indentWithTab]),
+                keymap.of([...vscodeKeymap, indentWithTab]),
                 indentationMarkers(),
                 cpp(),
                 vscodeDark,
@@ -708,6 +725,7 @@ int main()
             }, binaries);
             termInstance.clear();
             termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m");
+            setCompilerReady(true);
           } catch (err) {
             termInstance.clear();
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
@@ -720,13 +738,29 @@ int main()
         });
 
         const stopProgram = () => {
-          if (appState() !== "RUNNING") return;
+          if (appState() !== "RUNNING" && appState() !== "COMPILING") return;
           
+          // First try graceful cancellation via stdin pipe
           if (stdinPipeWriter) {
             stdinPipeWriter.cancel();
           }
           compilerApi.cancelRun();
+
+          // For CPU-bound infinite loops (e.g., while(1)), cancelRun() won't
+          // work because the WASM code never reads stdin. We need to force-
+          // terminate the worker and recreate it.
+          compilerApi.forceRestart();
+
+          // Clean up state since the pending compileAndRun promise will never resolve
+          if (terminalDataDisposable) {
+            terminalDataDisposable.dispose();
+            terminalDataDisposable = null;
+          }
+          stdinPipeWriter = null;
+          stdinSAB = null;
+
           setAppState("IDLE");
+          setStatusMessage("");
           if (termInstance) {
             termInstance.writeln("\n\x1b[33mProgram stopped by user.\x1b[0m");
           }
@@ -734,6 +768,7 @@ int main()
 
         const runProgram = async () => {
           if (appState() === "COMPILING" || appState() === "RUNNING") return;
+          if (!compilerReady()) return;
 
           setAppState("COMPILING");
           setExecutionError(null);
@@ -861,9 +896,9 @@ int main()
                 <Show when={appState() !== "RUNNING"}>
                   <button
                     onClick={runProgram}
-                    disabled={appState() === "COMPILING"}
+                    disabled={appState() === "COMPILING" || !compilerReady()}
                     class="flex items-center rounded-lg transition-colors p-2 disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white shrink-0"
-                    title="Run Program"
+                    title={!compilerReady() ? "Loading compiler..." : "Run Program"}
                   >
                     <Show when={appState() === "COMPILING"} fallback={<Icon name="play-arrow" color="ffffff" size={16} />}>
                       <div class="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.2)', 'border-left-color': '#fff' }}></div>
