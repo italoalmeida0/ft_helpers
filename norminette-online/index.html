@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>42 Norminette Online - C Style Checker and Formatter</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+
+    <!-- Pyodide -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/pyodide/v0.29.4/full/pyodide.js"
+    ></script>
+
+    <!-- Import Map including CodeMirror 6 + SolidJS -->
+    <script type="importmap">
+      {
+        "imports": {
+          "solid-js": "https://esm.sh/solid-js@1.9.12",
+          "solid-js/web": "https://esm.sh/solid-js@1.9.12/web",
+          "babel-preset-solid": "https://esm.sh/babel-preset-solid@1.9.12",
+          "@babel/standalone": "https://esm.sh/@babel/standalone@7.29.4",
+          "codemirror": "https://esm.sh/codemirror@6.0.2",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.42.1",
+          "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
+          "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
+          "@codemirror/lint": "https://esm.sh/@codemirror/lint@6.8.4",
+          "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
+          "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9",
+          "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import babelPresetSolid from "babel-preset-solid";
+      import Babel from "@babel/standalone";
+      Babel.registerPreset("solid", babelPresetSolid);
+    </script>
+
+    <style>
+      :root {
+        --color-base-100: #09090b;
+        --color-base-200: #18181b;
+        --color-base-300: #27272a;
+        --color-text-main: #d4d4d8;
+        --color-text-muted: #a1a1aa;
+        --color-text-disabled: #52525b;
+        --color-primary: #2563eb;
+        --color-primary-hover: #3b82f6;
+        --color-border-subtle: #27272a;
+        --fullh: 100vh;
+      }
+
+      @supports (height: 100dvh) {
+        :root {
+          --fullh: 100dvh;
+        }
+      }
+
+      body {
+        background-color: var(--color-base-100);
+        color: var(--color-text-main);
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+        overscroll-behavior: none;
+      }
+
+      body,
+      html {
+        height: var(--fullh);
+      }
+
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #52525b;
+      }
+
+      button {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* CodeMirror 6 Custom Overrides */
+      .cm-editor {
+        height: 100%;
+        width: 100%;
+        position: absolute !important;
+      }
+      .cm-scroller {
+        font-family: "Courier New", Courier, monospace;
+        font-size: 14px;
+        overflow: auto;
+      }
+
+      @media (max-width: 768px) {
+        .cm-scroller {
+          font-size: 13px;
+        }
+      }
+
+      /* Lint gutter styling */
+      .cm-lint-marker {
+        width: 8px !important;
+        height: 8px !important;
+      }
+
+      /* Custom lint panel at bottom */
+      .lint-panel {
+        background: #18181b;
+        border-top: 1px solid #27272a;
+        overflow-y: auto;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+      }
+
+      .lint-panel-item {
+        padding: 4px 12px;
+        border-bottom: 1px solid #1e1e2e;
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        cursor: pointer;
+        transition: background-color 0.15s;
+      }
+
+      .lint-panel-item:hover {
+        background-color: #27272a;
+      }
+
+      .lint-panel-item .lint-line {
+        color: #52525b;
+        min-width: 50px;
+        flex-shrink: 0;
+      }
+      .lint-panel-item .lint-severity {
+        font-weight: 600;
+        min-width: 40px;
+        flex-shrink: 0;
+      }
+      .lint-panel-item .lint-severity.error {
+        color: #f38ba8;
+      }
+      .lint-panel-item .lint-severity.notice {
+        color: #f9e2af;
+      }
+      .lint-panel-item .lint-name {
+        color: #89b4fa;
+        min-width: 140px;
+        flex-shrink: 0;
+      }
+      .lint-panel-item .lint-text {
+        color: #a6adc8;
+      }
+
+      /* Status bar */
+      .status-bar {
+        background: #18181b;
+        border-top: 1px solid #27272a;
+        font-size: 11px;
+        padding: 2px 12px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .status-dot.loading {
+        background-color: #f9e2af;
+        animation: pulse 1s infinite;
+      }
+      .status-dot.ready {
+        background-color: #a6e3a1;
+      }
+      .status-dot.error {
+        background-color: #f38ba8;
+      }
+      .status-dot.ok {
+        background-color: #a6e3a1;
+      }
+      .status-dot.has-errors {
+        background-color: #f38ba8;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+
+      /* Modal overlay */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+        backdrop-filter: blur(4px);
+      }
+
+      .modal-box {
+        background: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 12px;
+        padding: 24px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      }
+
+      .modal-input {
+        width: 100%;
+        background: #09090b;
+        color: #d4d4d8;
+        border: 1px solid #27272a;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 14px;
+        font-family: "Courier New", monospace;
+      }
+
+      .modal-input:focus {
+        outline: none;
+        border-color: #2563eb;
+      }
+
+      .modal-input::placeholder {
+        color: #52525b;
+      }
+    </style>
+  </head>
+  <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
+    <div id="root" class="h-full flex flex-col overflow-hidden"></div>
+
+
+    <script type="module">
+      import { ensureInit, format } from "./wasm-formatter.js";
+      window.__ftWasmFormat = format;
+      window.__ftWasmFormatInit = ensureInit;
+    </script>
+
+    <script type="text/babel" data-type="module" data-presets="solid">
+      import {
+        createSignal,
+        createMemo,
+        Show,
+        onMount,
+        onCleanup,
+        For,
+      } from "solid-js";
+      import { render } from "solid-js/web";
+      import { EditorView, keymap } from "@codemirror/view";
+      import { basicSetup } from "codemirror";
+      import { cpp } from "@codemirror/lang-cpp";
+      import { vscodeDark } from "@uiw/codemirror-theme-vscode";
+      import { indentationMarkers } from "@replit/codemirror-indentation-markers";
+      import { insertTab, indentLess } from "@codemirror/commands";
+      import { linter, lintGutter } from "@codemirror/lint";
+      import { Prec } from "@codemirror/state";
+
+      // ==========================================
+      // 42 HEADER GENERATOR
+      // ==========================================
+      const HEADER_LENGTH = 80;
+      const HEADER_MARGIN = 5;
+      const LS_USER_KEY = "norminette_42_user";
+      const LS_EMAIL_KEY = "norminette_42_email";
+      const LOCAL_STORAGE_KEY = "norminette_online_code";
+      const LS_FILENAME_KEY = "norminette_online_filename";
+      const LS_FILETYPE_KEY = "norminette_online_filetype";
+
+      const asciiArt = [
+        "        :::      ::::::::",
+        "      :+:      :+:    :+:",
+        "    +:+ +:+         +:+  ",
+        "  +#+  +:+       +#+     ",
+        "+#+#+#+#+#+   +#+        ",
+        "     #+#    #+#          ",
+        "    ###   ########.fr    ",
+      ];
+
+      function padRight(str, len) {
+        return (str + " ".repeat(len)).substring(0, len);
+      }
+
+      function textLine(left, right) {
+        left = left.substring(
+          0,
+          HEADER_LENGTH - HEADER_MARGIN * 2 - right.length,
+        );
+        const spaces = Math.max(
+          0,
+          HEADER_LENGTH - HEADER_MARGIN * 2 - left.length - right.length,
+        );
+        return (
+          "/*" +
+          " ".repeat(HEADER_MARGIN - 2) +
+          left +
+          " ".repeat(spaces) +
+          right +
+          " ".repeat(HEADER_MARGIN - 2) +
+          "*/"
+        );
+      }
+
+      function formatDate(date) {
+        const y = date.getFullYear();
+        const mo = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        const h = String(date.getHours()).padStart(2, "0");
+        const mi = String(date.getMinutes()).padStart(2, "0");
+        const s = String(date.getSeconds()).padStart(2, "0");
+        return `${y}/${mo}/${d} ${h}:${mi}:${s}`;
+      }
+
+      function generate42Header(filename, user, email) {
+        const now = new Date();
+        const dateStr = formatDate(now);
+        const fillLine =
+          "/* " + "*".repeat(HEADER_LENGTH - HEADER_MARGIN - 1) + " */";
+        const blankLine = textLine("", "");
+
+        const lines = [
+          fillLine,
+          blankLine,
+          textLine("", asciiArt[0]),
+          textLine(filename, asciiArt[1]),
+          textLine("", asciiArt[2]),
+          textLine(`By: ${user} <${email}>`, asciiArt[3]),
+          textLine("", asciiArt[4]),
+          textLine(`Created: ${dateStr} by ${user}`, asciiArt[5]),
+          textLine(`Updated: ${dateStr} by ${user}`, asciiArt[6]),
+          blankLine,
+          fillLine,
+        ];
+
+        return lines.join("\n") + "\n\n";
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // ==========================================
+      // ICON SYSTEM
+      // ==========================================
+      const svgCache = new Map();
+      const svgSignals = new Map();
+
+      function getIconUrl(name, color = "e4e4e7", size = 24) {
+        return `https://api.iconify.design/material-symbols/${name}.svg?color=%23${color}&height=${size}`;
+      }
+
+      function fetchIcon(name, color = "e4e4e7", size = 24) {
+        const key = `${name}|${color}|${size}`;
+        if (svgCache.has(key)) return svgCache.get(key);
+        if (svgSignals.has(key)) return svgSignals.get(key);
+
+        const [svg, setSvg] = createSignal("");
+        svgSignals.set(key, svg);
+
+        fetch(getIconUrl(name, color, size))
+          .then((r) => r.text())
+          .then((text) => {
+            svgCache.set(key, text);
+            setSvg(text);
+            svgSignals.delete(key);
+          })
+          .catch(() => {});
+
+        return svg();
+      }
+
+      const Icon = (props) => {
+        const name = () => props.name;
+        const color = () => props.color || "e4e4e7";
+        const size = () => props.size || 24;
+        const key = () => `${name()}|${color()}|${size()}`;
+
+        const svgContent = createMemo(() => {
+          const k = key();
+          if (svgCache.has(k)) return svgCache.get(k);
+          fetchIcon(name(), color(), size());
+          const sig = svgSignals.get(k);
+          return sig ? sig() : "";
+        });
+
+        return (
+          <Show when={svgContent()}>
+            <div
+              innerHTML={svgContent()}
+              class={`inline-flex items-center justify-center ${props.class || ""}`}
+              style={{ width: `${size()}px`, height: `${size()}px` }}
+            />
+          </Show>
+        );
+      };
+
+      // ==========================================
+      // MAIN APPLICATION COMPONENT
+      // ==========================================
+      function App() {
+        // State signals
+        const [statusState, setStatusState] = createSignal("loading");
+        const [statusText, setStatusText] = createSignal(
+          "Loading Pyodide and norminette...",
+        );
+        const [errorCount, setErrorCount] = createSignal(0);
+        const [errorCountColor, setErrorCountColor] = createSignal("#52525b");
+        const loadSavedFiletype = () => {
+          try {
+            const saved = localStorage.getItem(LS_FILETYPE_KEY);
+            return saved === ".h" ? ".h" : ".c";
+          } catch (e) {
+            return ".c";
+          }
+        };
+
+        const loadSavedFilename = () => {
+          try {
+            const saved = localStorage.getItem(LS_FILENAME_KEY);
+            return saved || "main.c";
+          } catch (e) {
+            return "main.c";
+          }
+        };
+
+        const [filetype, setFiletype] = createSignal(loadSavedFiletype());
+        const [filename, setFilename] = createSignal(loadSavedFilename());
+        const [lintResults, setLintResults] = createSignal([]);
+        const [lintPanelVisible, setLintPanelVisible] = createSignal(false);
+        const [lintPanelHeight, setLintPanelHeight] = createSignal(0);
+        const [modalVisible, setModalVisible] = createSignal(false);
+        const [modalUser, setModalUser] = createSignal("");
+        const [modalEmail, setModalEmail] = createSignal("");
+        const [formatterReady, setFormatterReady] = createSignal(false);
+
+        // Refs
+        let editorContainerRef;
+        let cmView = null;
+        let pyodide = null;
+        let isReady = false;
+        let saveTimeout = null;
+
+
+
+        const defaultCode = `#include <stdio.h>
+
+int main(){
+    printf("Hello, 42!\\n");
+    return 0;
+}
+`;
+
+        const loadSavedCode = () => {
+          try {
+            const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+            return saved !== null ? saved : defaultCode;
+          } catch (e) {
+            return defaultCode;
+          }
+        };
+
+        // ==========================================
+        // Status helpers
+        // ==========================================
+        const setStatus = (state, text) => {
+          setStatusState(state);
+          setStatusText(text);
+        };
+
+        const updateErrorCount = (count) => {
+          setErrorCount(count);
+          setErrorCountColor(count > 0 ? "#f38ba8" : "#52525b");
+        };
+
+        const forceLint = () => {
+          if (!cmView) return;
+          cmView.dispatch({
+            changes: {
+              from: 0,
+              to: cmView.state.doc.length,
+              insert: cmView.state.doc.toString(),
+            },
+          });
+        };
+
+        // ==========================================
+        // Lint Panel
+        // ==========================================
+        const showLintPanel = (errors) => {
+          if (errors.length === 0) {
+            setLintPanelVisible(false);
+            setLintPanelHeight(0);
+            return;
+          }
+
+          setLintPanelVisible(true);
+          const maxH = Math.min(200, Math.max(80, errors.length * 30));
+          setLintPanelHeight(maxH);
+          setLintResults(errors);
+        };
+
+        const onLintItemClick = (line, col) => {
+          if (cmView && line > 0) {
+            const pos =
+              cmView.state.doc.line(Math.min(line, cmView.state.doc.lines))
+                .from + Math.max(0, col - 1);
+            cmView.dispatch({
+              selection: { anchor: pos },
+              scrollIntoView: true,
+            });
+            cmView.focus();
+          }
+        };
+
+        // ==========================================
+        // CodeMirror Linter for Norminette
+        // ==========================================
+        const norminetteLinter = linter(
+          async (view) => {
+            if (!isReady) return [];
+
+            const code = view.state.doc.toString();
+            if (!code.trim()) return [];
+
+            const ft = filetype();
+            const fn = filename() || "file" + ft;
+
+            try {
+              pyodide.globals.set("source_code", code);
+              pyodide.globals.set("file_name", fn);
+
+              const resultJson = await pyodide.runPython(
+                "run_norminette(source_code, file_name)",
+              );
+              const result = JSON.parse(resultJson);
+              const fileInfo = result.files[0];
+
+              const lintErrors = [];
+              const diagnostics = [];
+
+              for (const err of fileInfo.errors) {
+                const hl = err.highlights[0];
+                if (!hl) continue;
+
+                const lineno = Math.max(
+                  1,
+                  Math.min(hl.lineno, view.state.doc.lines),
+                );
+                const line = view.state.doc.line(lineno);
+                const from = line.from + Math.max(0, hl.column - 1);
+                const to = Math.min(from + (hl.length || 1), line.to);
+
+                diagnostics.push({
+                  from,
+                  to,
+                  severity: err.level === "Notice" ? "warning" : "error",
+                  message: `${err.name}: ${err.text}`,
+                  source: "norminette",
+                });
+
+                lintErrors.push({
+                  lineno: hl.lineno,
+                  column: hl.column,
+                  level: err.level,
+                  name: err.name,
+                  text: err.text,
+                });
+              }
+
+              if (fileInfo.status === "OK") {
+                setStatus("ok", "No errors");
+                updateErrorCount(0);
+              } else {
+                setStatus(
+                  "has-errors",
+                  `${fileInfo.errors.length} error(s)`,
+                );
+                updateErrorCount(fileInfo.errors.length);
+              }
+
+              showLintPanel(lintErrors);
+              return diagnostics;
+            } catch (err) {
+              console.error("Norminette lint error:", err);
+              return [];
+            }
+          },
+          { delay: 750 },
+        );
+
+        // ==========================================
+        // Format code
+        // ==========================================
+        const formatCode = async () => {
+          if (!isReady || !formatterReady()) return;
+          const code = cmView.state.doc.toString();
+          if (!code.trim()) return;
+
+          try {
+            setStatus("loading", "Formatting...");
+
+            // Step 1: Run wasm clang-format
+            const clangFormatted = window.__ftWasmFormat(code, filename() || "main.c");
+
+            // Step 2: Run c_formatter_42 Python formatters in Pyodide
+            pyodide.globals.set("__ft_code", clangFormatted);
+            const pyFormatted = await pyodide.runPython("run_all(__ft_code)");
+
+            if (pyFormatted && pyFormatted !== code) {
+              cmView.dispatch({
+                changes: {
+                  from: 0,
+                  to: cmView.state.doc.length,
+                  insert: pyFormatted,
+                },
+              });
+              setStatus("ready", "Formatted");
+            } else {
+              setStatus("ready", "Already formatted");
+            }
+          } catch (err) {
+            console.error("Formatter error:", err);
+            setStatus("error", "Format error: " + err.message);
+          }
+        };
+
+        // ==========================================
+        // Clear code
+        // ==========================================
+        const clearCode = () => {
+          if (!confirm("Reset code to default? This will overwrite your current code.")) return;
+          cmView.dispatch({
+            changes: { from: 0, to: cmView.state.doc.length, insert: defaultCode },
+          });
+          setLintPanelVisible(false);
+          setLintPanelHeight(0);
+          updateErrorCount(0);
+          setFiletype(".c");
+          setFilename("main.c");
+          setStatus("ready", "Ready");
+        };
+
+        // ==========================================
+        // 42 Header Modal
+        // ==========================================
+        const loadHeaderSettings = () => {
+          try {
+            setModalUser(localStorage.getItem(LS_USER_KEY) || "");
+            setModalEmail(localStorage.getItem(LS_EMAIL_KEY) || "");
+          } catch (e) {}
+        };
+
+        const saveHeaderSettings = (user, email) => {
+          try {
+            localStorage.setItem(LS_USER_KEY, user);
+            localStorage.setItem(LS_EMAIL_KEY, email);
+          } catch (e) {}
+        };
+
+        const openHeaderModal = () => {
+          loadHeaderSettings();
+          setModalVisible(true);
+        };
+
+        const closeHeaderModal = () => {
+          setModalVisible(false);
+        };
+
+        const insertHeader = () => {
+          const user = modalUser().trim();
+          const email = modalEmail().trim();
+
+          if (!user || !email) {
+            setStatus("error", "Please fill in both username and email");
+            return;
+          }
+
+          saveHeaderSettings(user, email);
+          setModalVisible(false);
+
+          const fn = filename().trim() || "main.c";
+          const header = generate42Header(fn, user, email);
+          const currentCode = cmView.state.doc.toString().trimStart();
+
+          // Smart header detection: ltrim each line, find the last consecutive
+          // line from the top that starts with '/', delete everything up to it
+          // (plus trailing blank lines), then insert the new header.
+          const lines = currentCode.split("\n");
+          let headerEndLine = -1;
+
+          for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trimStart();
+            if (trimmed.startsWith("/")) {
+              headerEndLine = i;
+            } else {
+              // Stop at first non-'/' line after the header block
+              break;
+            }
+          }
+
+          // Determine where the actual code starts (skip blank lines after header)
+          let codeStartLine = 0;
+          if (headerEndLine >= 0) {
+            codeStartLine = headerEndLine + 1;
+            while (
+              codeStartLine < lines.length &&
+              lines[codeStartLine].trim() === ""
+            ) {
+              codeStartLine++;
+            }
+          }
+
+          const codeWithoutHeader = lines.slice(codeStartLine).join("\n");
+
+          cmView.dispatch({
+            changes: {
+              from: 0,
+              to: cmView.state.doc.length,
+              insert: header + codeWithoutHeader,
+            },
+          });
+
+          setStatus("ready", "42 header inserted");
+        };
+
+        // ==========================================
+        // Filetype / Filename sync
+        // ==========================================
+        const onFiletypeChange = (e) => {
+          const newExt = e.target.value;
+          setFiletype(newExt);
+          const current = filename();
+          const base = current.replace(/\.[ch]$/, "");
+          const newName = base + newExt;
+          setFilename(newName);
+          try {
+            localStorage.setItem(LS_FILETYPE_KEY, newExt);
+            localStorage.setItem(LS_FILENAME_KEY, newName);
+          } catch (e) {}
+          if (isReady) forceLint();
+        };
+
+        const onFilenameInput = (e) => {
+          const val = e.target.value;
+          setFilename(val);
+          if (val.endsWith(".h")) setFiletype(".h");
+          else if (val.endsWith(".c")) setFiletype(".c");
+          try {
+            localStorage.setItem(LS_FILENAME_KEY, val);
+            localStorage.setItem(LS_FILETYPE_KEY, val.endsWith(".h") ? ".h" : ".c");
+          } catch (e) {}
+          if (isReady) forceLint();
+        };
+
+        // ==========================================
+        // Initialize on mount
+        // ==========================================
+        onMount(async () => {
+          // Start wasm formatter initialization early
+          const wasmInitPromise = window.__ftWasmFormatInit
+            ? window.__ftWasmFormatInit().catch((e) => {
+                console.error("Wasm formatter init error:", e);
+                return false;
+              })
+            : Promise.resolve(false);
+
+          // Initialize CodeMirror
+          if (editorContainerRef) {
+            cmView = new EditorView({
+              doc: loadSavedCode(),
+              extensions: [
+                basicSetup,
+                keymap.of([
+                  {
+                    key: "Tab",
+                    run: insertTab,
+                  },
+                  {
+                    key: "Shift-Tab",
+                    run: indentLess,
+                  },
+                ]),
+                indentationMarkers(),
+                cpp(),
+                vscodeDark,
+                norminetteLinter,
+                lintGutter(),
+                Prec.highest(
+                  keymap.of([
+                    { key: "Mod-s", run: () => true },
+                    {
+                      key: "Mod-Shift-f",
+                      run: () => {
+                        if (isReady && formatterReady()) formatCode();
+                        return true;
+                      },
+                    },
+                  ]),
+                ),
+                EditorView.updateListener.of((update) => {
+                  if (update.docChanged) {
+                    const newCode = update.state.doc.toString();
+                    if (saveTimeout) clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(() => {
+                      try {
+                        localStorage.setItem(LOCAL_STORAGE_KEY, newCode);
+                      } catch (e) {}
+                    }, 1000);
+                  }
+                }),
+              ],
+              parent: editorContainerRef,
+            });
+          }
+
+          // Initialize Pyodide
+          try {
+            pyodide = await loadPyodide();
+            setStatus("loading", "Installing micropip...");
+
+            await pyodide.loadPackage("micropip");
+            const micropip = pyodide.pyimport("micropip");
+
+            setStatus("loading", "Installing norminette...");
+            await micropip.install("norminette");
+
+            setStatus("loading", "Installing c_formatter_42...");
+            await micropip.install("c_formatter_42");
+
+            // Define run_norminette and run_all (without clang_format binary step)
+            await pyodide.runPython(`
+from norminette.context import Context
+from norminette.errors import JSONErrorsFormatter
+from norminette.exceptions import CParsingError
+from norminette.file import File
+from norminette.lexer import Lexer
+from norminette.registry import Registry
+import json
+
+def run_norminette(source_code, filename="main.c"):
+    file = File(filename, source_code)
+    registry = Registry()
+    try:
+        lexer = Lexer(file)
+        tokens = list(lexer)
+        context = Context(file, tokens, debug=0)
+        registry.run(context)
+    except CParsingError as e:
+        return json.dumps({
+            "files": [{"path": filename, "status": "Error",
+                "errors": [{"name": "PARSE_ERROR", "text": str(e.msg), "level": "Error",
+                            "highlights": [{"lineno": 1, "column": 1, "length": 1, "hint": None}]}]
+        }]})
+
+    return str(JSONErrorsFormatter([file], use_colors=False))
+
+from c_formatter_42.formatters.align import align
+from c_formatter_42.formatters.hoist import hoist
+from c_formatter_42.formatters.line_breaker import line_breaker
+from c_formatter_42.formatters.misc import (
+    insert_void,
+    parenthesize_return,
+    remove_multiline_condition_space,
+    space_before_semi_colon,
+)
+from c_formatter_42.formatters.preprocessor_directive import preprocessor_directive
+from c_formatter_42.formatters.return_type_single_tab import return_type_single_tab
+
+def run_all(content):
+    content = preprocessor_directive(content)
+    content = remove_multiline_condition_space(content)
+    content = parenthesize_return(content)
+    content = space_before_semi_colon(content)
+    content = hoist(content)
+    content = align(content)
+    content = return_type_single_tab(content)
+    content = insert_void(content)
+    content = line_breaker(content)
+    return content
+`);
+
+            // Wait for wasm formatter to be ready
+            await wasmInitPromise;
+
+            isReady = true;
+            setFormatterReady(true);
+            setStatus("ready", "Ready — norminette + c_formatter_42 loaded");
+            updateErrorCount(0);
+
+            // Force-lint
+            forceLint();
+          } catch (err) {
+            setStatus("error", "Failed to load: " + err.message);
+            console.error("Pyodide loading error:", err);
+          }
+        });
+
+        onCleanup(() => {
+          if (cmView) cmView.destroy();
+          if (saveTimeout) clearTimeout(saveTimeout);
+        });
+
+        return (
+          <div class="h-full flex flex-col overflow-hidden">
+            {/* Header */}
+            <header class="bg-[#18181b] border-b border-[#27272a] px-3 py-2 md:px-4 md:py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between shrink-0 gap-2">
+              <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
+                <div class="bg-[#7c2d12] p-1.5 rounded-lg flex items-center justify-center shrink-0">
+                  <Icon name="rule" color="fb923c" size={20} />
+                </div>
+                <div class="min-w-0">
+                  <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">
+                    42 Norminette
+                  </h1>
+                  <p class="text-[10px] md:text-xs text-[#52525b] hidden sm:block">
+                    C Style Checker and Formatter — runs in your browser
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-1 md:gap-2 shrink-0 w-full sm:w-auto">
+                {/* File type selector */}
+                <select
+                  value={filetype()}
+                  onChange={onFiletypeChange}
+                  class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value=".c">.c file</option>
+                  <option value=".h">.h file</option>
+                </select>
+
+                {/* Filename input */}
+                <input
+                  type="text"
+                  value={filename()}
+                  onInput={onFilenameInput}
+                  class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 w-20 md:w-28 font-mono"
+                  placeholder="filename.c"
+                />
+
+                {/* 42 Header button */}
+                <button
+                  onClick={openHeaderModal}
+                  class="flex items-center rounded-lg transition-colors px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold gap-1.5 shrink-0"
+                  title="Insert 42 header"
+                >
+                  <Icon name="table" color="ffffff" size={14} />
+                  <span>ft_putheader</span>
+                </button>
+
+                {/* Format button */}
+                <button
+                  onClick={formatCode}
+                  disabled={!formatterReady()}
+                  class="flex items-center rounded-lg transition-colors px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold gap-1.5 shrink-0"
+                  title={formatterReady() ? "Format" : "Formatter loading..."}
+                >
+                  <Icon name="format-line-spacing" color="ffffff" size={14} />
+                  <span>ft_format</span>
+                </button>
+
+                {/* Clear button */}
+                <button
+                  onClick={clearCode}
+                  class="p-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] transition-colors flex"
+                  title="Clear Code"
+                >
+                  <Icon name="delete" size={16} />
+                </button>
+              </div>
+            </header>
+
+            {/* Main Content */}
+            <div class="flex-1 flex flex-col overflow-hidden min-h-0">
+              {/* Editor */}
+              <div class="flex-1 relative min-h-0 overflow-hidden bg-[#1e1e1e]">
+                <div ref={editorContainerRef} class="absolute inset-0"></div>
+              </div>
+
+              {/* Lint Panel */}
+              <Show when={lintPanelVisible()}>
+                <div
+                  class="lint-panel shrink-0"
+                  style={{ height: `${lintPanelHeight()}px` }}
+                >
+                  <For each={lintResults()}>
+                    {(err) => {
+                      const severityClass =
+                        err.level === "Notice" ? "notice" : "error";
+                      return (
+                        <div
+                          class="lint-panel-item"
+                          onClick={() =>
+                            onLintItemClick(err.lineno, err.column)
+                          }
+                        >
+                          <span class="lint-line">
+                            L{err.lineno}:C{err.column}
+                          </span>
+                          <span class={`lint-severity ${severityClass}`}>
+                            {err.level}
+                          </span>
+                          <span class="lint-name">{err.name}</span>
+                          <span class="lint-text">{err.text}</span>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+            </div>
+
+            {/* Status Bar */}
+            <div class="status-bar">
+              <span class={`status-dot ${statusState()}`}></span>
+              <span class="text-[#52525b]">{statusText()}</span>
+              <span class="flex-1"></span>
+              <span class="text-[#52525b]" style={{ color: errorCountColor() }}>
+                {errorCount() > 0 ? `${errorCount()} error(s)` : ""}
+              </span>
+            </div>
+
+            {/* 42 Header Modal */}
+            <Show when={modalVisible()}>
+              <div
+                class="modal-overlay"
+                onPointerDown={(e) => {
+                  if (e.target === e.currentTarget) closeHeaderModal();
+                }}
+              >
+                <div class="modal-box">
+                  <h2 class="text-lg font-bold text-[#d4d4d8] mb-1">
+                    42 Header Settings
+                  </h2>
+                  <p class="text-xs text-[#52525b] mb-4">
+                    Insert the 42 header into your file.
+                  </p>
+
+                  <div class="space-y-3 mb-5">
+                    <div>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">
+                        42 Username
+                      </label>
+                      <input
+                        type="text"
+                        value={modalUser()}
+                        onInput={(e) => setModalUser(e.target.value)}
+                        class="modal-input"
+                        placeholder="marvin"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">
+                        42 Email
+                      </label>
+                      <input
+                        type="text"
+                        value={modalEmail()}
+                        onInput={(e) => setModalEmail(e.target.value)}
+                        class="modal-input"
+                        placeholder="marvin@marvin@42.fr"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="flex gap-2 justify-end">
+                    <button
+                      onClick={closeHeaderModal}
+                      class="px-4 py-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] text-sm font-semibold transition-colors"
+                    >
+                      ft_cancel
+                    </button>
+                    <button
+                      onClick={insertHeader}
+                      class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+                    >
+                      ft_save_and_put
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+          </div>
+        );
+      }
+
+      render(() => <App />, document.getElementById("root"));
+    </script>
+  </body>
+</html>

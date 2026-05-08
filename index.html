@@ -75,8 +75,8 @@
       </div>
 
       <!-- Playgrounds Grid -->
-      <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+      <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6">
+
         <!-- Push Swap Card -->
         <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200">
           <div class="flex items-center justify-between mb-4">
@@ -90,14 +90,14 @@
               Visualizer
             </span>
           </div>
-          
+
           <p class="text-[#a1a1aa] text-sm mb-6 flex-1">
             An interactive web-based visualizer for the Push_Swap project. Write C code, compile it using WebAssembly, and watch your sorting algorithm animate in real-time. Includes integrated benchmark scoring.
           </p>
-          
+
           <div class="flex items-center space-x-3 mt-auto">
-            <a 
-              href="./push_swap/" 
+            <a
+              href="./push_swap/"
               class="flex-1 text-center bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
             >
               Launch Playground
@@ -127,6 +127,34 @@
             <a
               href="./c-playground/"
               class="flex-1 text-center bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
+            >
+              Launch Playground
+            </a>
+          </div>
+        </div>
+
+        <!-- 42 Norminette Online Card -->
+        <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-3">
+              <div class="bg-[#7c2d12] p-2 rounded-lg">
+                <img src="https://api.iconify.design/material-symbols/rule.svg?color=%23fb923c&height=28" alt="Norminette Icon" class="w-7 h-7" />
+              </div>
+              <h3 class="text-xl font-bold text-white">Norminette</h3>
+            </div>
+            <span class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
+              Linter
+            </span>
+          </div>
+
+          <p class="text-[#a1a1aa] text-sm mb-6 flex-1">
+            An online C style checker and formatter based on 42 School norminette rules. Check your code style, get real-time diagnostics, auto-format, and generate 42 headers directly in the browser.
+          </p>
+
+          <div class="flex items-center space-x-3 mt-auto">
+            <a
+              href="./norminette-online/"
+              class="flex-1 text-center bg-orange-600 hover:bg-orange-500 text-white font-semibold py-2.5 rounded-lg transition-colors"
             >
               Launch Playground
             </a>

@@ -8,7 +8,7 @@ A collection of interactive playgrounds, visualizers, and debugging tools design
 
 ## 🚀 Available Tools
 
-### 1. [Push_Swap Visualizer](https://italoalmeida0.github.io/ft_helpers/push_swap/)
+### 1. [42 Push Swap Visualizer](https://italoalmeida0.github.io/ft_helpers/push_swap/)
 An interactive web-based playground for the 42 `push_swap` project.
 
 **Key Features:**
@@ -26,6 +26,16 @@ A general-purpose online C compiler and runtime environment.
 * **Standard Input (stdin):** Provide input data for `scanf()`, `getchar()`, `fgets()`, and other stdin-reading functions.
 * **Mobile Friendly:** Fully responsive layout with a mobile-optimized interface, including tab switching between the terminal and input panels.
 * **Integrated Terminal:** Real-time program output with an xterm.js terminal emulator.
+
+### 3. [42 Norminette Online](https://italoalmeida0.github.io/ft_helpers/norminette-online/)
+An online C style checker and formatter based on the 42 School norminette rules.
+
+**Key Features:**
+* **In-Browser Linting:** Check your C code against the official 42 norminette rules directly in the browser using Pyodide. No backend required.
+* **Real-time Diagnostics:** See errors and notices with line numbers in an integrated lint panel, with clickable navigation to the exact line in the editor.
+* **Automatic Formatting:** Format your code with a built-in C formatter to quickly fix indentation and style issues.
+* **42 Header Generator:** Quickly generate standard 42-style file headers with your username and email.
+* **Code Persistence:** Your code, filename, and user info are automatically saved to local storage.
 
 ---
 

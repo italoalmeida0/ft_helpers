@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>42 push_swap - Playground</title>
+    <title>42 Push Swap - Playground</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,7 +35,6 @@
           "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
           "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
           "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
-          "@replit/codemirror-vscode-keymap": "https://esm.sh/@replit/codemirror-vscode-keymap@6.0.2",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
@@ -168,8 +167,7 @@
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
       import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-      import { vscodeKeymap } from '@replit/codemirror-vscode-keymap';
-      import { indentWithTab } from "@codemirror/commands";
+      import { insertTab, indentLess } from "@codemirror/commands";
       import { Prec } from '@codemirror/state';
 
       // ==========================================
@@ -757,7 +755,16 @@ int main(int argc, char **argv) {
               doc: scriptCode(),
               extensions: [
                 basicSetup,
-                keymap.of([...vscodeKeymap, indentWithTab]),
+                keymap.of([
+                  {
+                    key: "Tab",
+                    run: insertTab,
+                  },
+                  {
+                    key: "Shift-Tab",
+                    run: indentLess,
+                  },
+                ]),
                 indentationMarkers(),
                 cpp(),
                 vscodeDark,
@@ -1069,8 +1076,13 @@ int main(int argc, char **argv) {
             {/* Header */}
             <header class="bg-[#18181b] border-b border-[#27272a] p-3 md:p-4 flex flex-wrap items-center justify-between shrink-0 gap-3">
               <div class="flex items-center space-x-3">
-                <Icon name="swap-vert" color="3b82f6" size={28} />
-                <h1 class="text-lg md:text-xl font-bold text-[#d4d4d8]">42 push_swap</h1>
+                <div class="bg-[#1e3a8a] p-1.5 rounded-lg flex items-center justify-center shrink-0">
+                  <Icon name="swap-vert" color="93c5fd" size={20} />
+                </div>
+                <div class="min-w-0">
+                  <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">42 Push Swap</h1>
+                  <p class="text-[10px] md:text-xs text-[#52525b] hidden sm:block">An interactive web-based visualizer</p>
+                </div>
               </div>
               <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2 bg-[#09090b] rounded-lg p-1 border border-[#27272a]">

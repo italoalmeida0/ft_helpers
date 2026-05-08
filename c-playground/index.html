@@ -35,7 +35,6 @@
           "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
           "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
           "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
-          "@replit/codemirror-vscode-keymap": "https://esm.sh/@replit/codemirror-vscode-keymap@6.0.2",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
@@ -161,8 +160,7 @@
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
       import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-      import { vscodeKeymap } from '@replit/codemirror-vscode-keymap';
-      import { indentWithTab } from "@codemirror/commands";
+      import { insertTab, indentLess } from "@codemirror/commands";
       import { Prec } from '@codemirror/state';
 
       // ==========================================
@@ -658,7 +656,16 @@ int main()
               doc: scriptCode(),
               extensions: [
                 basicSetup,
-                keymap.of([...vscodeKeymap, indentWithTab]),
+                keymap.of([
+                  {
+                    key: "Tab",
+                    run: insertTab,
+                  },
+                  {
+                    key: "Shift-Tab",
+                    run: indentLess,
+                  },
+                ]),
                 indentationMarkers(),
                 cpp(),
                 vscodeDark,
@@ -856,8 +863,8 @@ int main()
             {/* Header */}
             <header class="bg-[#18181b] border-b border-[#27272a] px-3 py-2 md:px-4 md:py-3 flex items-center justify-between shrink-0 gap-2">
               <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
-                <div class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center shrink-0">
-                  <Icon name="code" color="ffffff" size={20} />
+                <div class="bg-[#064e3b] p-1.5 rounded-lg flex items-center justify-center shrink-0">
+                  <Icon name="code" color="34d399" size={20} />
                 </div>
                 <div class="min-w-0">
                   <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">C Playground</h1>
