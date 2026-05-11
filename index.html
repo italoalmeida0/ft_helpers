@@ -3,11 +3,81 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ft_helpers - 42 School Projects</title>
+    <title>
+      ft_helpers – Online Tools & Visualizers for 42 School Projects
+    </title>
+    <meta
+      name="description"
+      content="Free online tools, visualizers, and compilers for 42 School students. Includes Push Swap visualizer, C Playground compiler, and Norminette style checker — all running in your browser."
+    />
+    <meta
+      name="keywords"
+      content="42 school, 42 porto, push swap, c playground, norminette, online compiler, c compiler, code visualizer, sorting algorithm, 42 projects, ft_helpers"
+    />
+    <meta name="author" content="Italo Almeida" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://italoalmeida0.github.io/ft_helpers/" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://italoalmeida0.github.io/ft_helpers/"
+    />
+    <meta
+      property="og:title"
+      content="ft_helpers – Online Tools & Visualizers for 42 School Projects"
+    />
+    <meta
+      property="og:description"
+      content="Free online tools, visualizers, and compilers for 42 School students. Includes Push Swap visualizer, C Playground compiler, and Norminette style checker."
+    />
+    <meta property="og:site_name" content="ft_helpers" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="ft_helpers – Online Tools & Visualizers for 42 School Projects"
+    />
+    <meta
+      name="twitter:description"
+      content="Free online tools, visualizers, and compilers for 42 School students. Includes Push Swap visualizer, C Playground compiler, and Norminette style checker."
+    />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "ft_helpers",
+        "url": "https://italoalmeida0.github.io/ft_helpers/",
+        "description": "Free online tools, visualizers, and compilers for 42 School students.",
+        "author": {
+          "@type": "Person",
+          "name": "Italo Almeida",
+          "url": "https://github.com/italoalmeida0"
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://italoalmeida0.github.io/ft_helpers/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+
+    <link
+      rel="icon"
+      href="https://api.iconify.design/material-symbols/school-outline.svg?color=%231e3a8a&height=28"
+      type="image/svg+xml"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+      rel="stylesheet"
+    />
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,46 +85,69 @@
     <style type="text/tailwindcss">
       @layer base {
         :root {
-          --color-base-100: #09090b; 
-          --color-base-200: #18181b; 
-          --color-base-300: #27272a; 
-          --color-text-main: #d4d4d8; 
-          --color-text-muted: #a1a1aa; 
-          --color-primary: #2563eb; 
-          --color-primary-hover: #3b82f6; 
+          --color-base-100: #09090b;
+          --color-base-200: #18181b;
+          --color-base-300: #27272a;
+          --color-text-main: #d4d4d8;
+          --color-text-muted: #a1a1aa;
+          --color-primary: #2563eb;
+          --color-primary-hover: #3b82f6;
         }
         body {
           background-color: var(--color-base-100);
           color: var(--color-text-main);
-          font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+          font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
         }
       }
-      
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #52525b;
+      }
     </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8] min-h-screen flex flex-col">
-
     <!-- Header -->
-    <header class="bg-[#18181b] border-b border-[#27272a] p-4 md:px-8 flex flex-wrap items-center justify-between sticky top-0 z-10">
+    <header
+      class="bg-[#18181b] border-b border-[#27272a] p-4 md:px-8 flex flex-wrap items-center justify-between sticky top-0 z-10"
+    >
       <div class="flex items-center space-x-3">
         <!-- Main Logo / Title -->
-        <div class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center">
-            <img src="https://api.iconify.design/material-symbols/code-blocks-outline.svg?color=%23ffffff&height=24" alt="ft_helpers logo" class="w-6 h-6" />
+        <div
+          class="bg-blue-600 p-1.5 rounded-lg flex items-center justify-center"
+        >
+          <img
+            src="https://api.iconify.design/material-symbols/school-outline.svg?color=%23ffffff&height=24"
+            alt="ft_helpers logo"
+            class="w-6 h-6"
+          />
         </div>
-        <h1 class="text-xl font-bold text-[#d4d4d8] tracking-tight">ft_helpers</h1>
+        <h1 class="text-xl font-bold text-[#d4d4d8] tracking-tight">
+          ft_helpers
+        </h1>
       </div>
       <div class="flex items-center space-x-4">
-        <a 
-          href="https://github.com/italoalmeida0/ft_helpers/" 
-          target="_blank" 
+        <a
+          href="https://github.com/italoalmeida0/ft_helpers/"
+          target="_blank"
           rel="noopener noreferrer"
           class="flex items-center space-x-2 bg-[#27272a] hover:bg-[#3f3f46] text-[#d4d4d8] px-4 py-2 rounded-lg text-sm font-medium transition-colors border border-[#3f3f46]"
         >
-          <img src="https://api.iconify.design/mdi/github.svg?color=%23d4d4d8&height=20" alt="GitHub" class="w-5 h-5" />
+          <img
+            src="https://api.iconify.design/mdi/github.svg?color=%23d4d4d8&height=20"
+            alt="GitHub"
+            class="w-5 h-5"
+          />
           <span>Repository</span>
         </a>
       </div>
@@ -62,37 +155,50 @@
 
     <!-- Main Content -->
     <main class="flex-1 flex flex-col items-center justify-center p-6 md:p-12">
-      
       <!-- Hero Section -->
       <div class="text-center max-w-2xl mb-12">
-        <h2 class="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
-          Tools & Visualizers <br/> 
+        <h2
+          class="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight"
+        >
+          Tools & Visualizers <br />
           <span class="text-blue-500">for 42 School</span>
         </h2>
         <p class="text-base md:text-lg text-[#a1a1aa] leading-relaxed">
-          A collection of interactive playgrounds and debugging tools designed to help students understand, optimize, and test their 42 School projects directly in the browser.
+          A collection of interactive playgrounds and debugging tools designed
+          to help students understand, optimize, and test their 42 School
+          projects directly in the browser.
         </p>
       </div>
 
       <!-- Playgrounds Grid -->
       <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6">
-
         <!-- Push Swap Card -->
-        <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200">
+        <div
+          class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200"
+        >
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-3">
               <div class="bg-[#1e3a8a] p-2 rounded-lg">
-                <img src="https://api.iconify.design/material-symbols/swap-vert.svg?color=%2393c5fd&height=28" alt="Push Swap Icon" class="w-7 h-7" />
+                <img
+                  src="https://api.iconify.design/material-symbols/swap-vert.svg?color=%2393c5fd&height=28"
+                  alt="Push Swap Icon"
+                  class="w-7 h-7"
+                />
               </div>
               <h3 class="text-xl font-bold text-white">Push Swap</h3>
             </div>
-            <span class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
+            <span
+              class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider"
+            >
               Visualizer
             </span>
           </div>
 
           <p class="text-[#a1a1aa] text-sm mb-6 flex-1">
-            An interactive web-based visualizer for the Push_Swap project. Write C code, compile it using WebAssembly, and watch your sorting algorithm animate in real-time. Includes integrated benchmark scoring.
+            An interactive web-based visualizer for the Push_Swap project. Write
+            C code, compile it using WebAssembly, and watch your sorting
+            algorithm animate in real-time. Includes integrated benchmark
+            scoring.
           </p>
 
           <div class="flex items-center space-x-3 mt-auto">
@@ -106,21 +212,31 @@
         </div>
 
         <!-- C Playground Card -->
-        <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200">
+        <div
+          class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200"
+        >
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-3">
               <div class="bg-[#064e3b] p-2 rounded-lg">
-                <img src="https://api.iconify.design/material-symbols/code.svg?color=%2334d399&height=28" alt="C Playground Icon" class="w-7 h-7" />
+                <img
+                  src="https://api.iconify.design/material-symbols/code.svg?color=%2334d399&height=28"
+                  alt="C Playground Icon"
+                  class="w-7 h-7"
+                />
               </div>
               <h3 class="text-xl font-bold text-white">C Playground</h3>
             </div>
-            <span class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
+            <span
+              class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider"
+            >
               Compiler
             </span>
           </div>
 
           <p class="text-[#a1a1aa] text-sm mb-6 flex-1">
-            A general-purpose online C compiler. Write, compile, and run C code directly in the browser. Supports command-line arguments (argv) and standard input (stdin) for interactive programs.
+            A general-purpose online C compiler. Write, compile, and run C code
+            directly in the browser. Supports command-line arguments (argv) and
+            standard input (stdin) for interactive programs.
           </p>
 
           <div class="flex items-center space-x-3 mt-auto">
@@ -134,21 +250,31 @@
         </div>
 
         <!-- 42 Norminette Online Card -->
-        <div class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200">
+        <div
+          class="bg-[#18181b] border border-[#27272a] rounded-2xl p-6 flex flex-col transition-transform hover:-translate-y-1 hover:border-[#3f3f46] hover:shadow-lg hover:shadow-black/50 duration-200"
+        >
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-3">
               <div class="bg-[#7c2d12] p-2 rounded-lg">
-                <img src="https://api.iconify.design/material-symbols/rule.svg?color=%23fb923c&height=28" alt="Norminette Icon" class="w-7 h-7" />
+                <img
+                  src="https://api.iconify.design/material-symbols/rule.svg?color=%23fb923c&height=28"
+                  alt="Norminette Icon"
+                  class="w-7 h-7"
+                />
               </div>
               <h3 class="text-xl font-bold text-white">Norminette</h3>
             </div>
-            <span class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider">
+            <span
+              class="bg-[#27272a] text-[#a1a1aa] text-xs font-bold px-2 py-1 rounded uppercase tracking-wider"
+            >
               Linter
             </span>
           </div>
 
           <p class="text-[#a1a1aa] text-sm mb-6 flex-1">
-            An online C style checker and formatter based on 42 School norminette rules. Check your code style, get real-time diagnostics, auto-format, and generate 42 headers directly in the browser.
+            An online C style checker and formatter based on 42 School
+            norminette rules. Check your code style, get real-time diagnostics,
+            auto-format, and generate 42 headers directly in the browser.
           </p>
 
           <div class="flex items-center space-x-3 mt-auto">
@@ -160,14 +286,14 @@
             </a>
           </div>
         </div>
-
       </div>
     </main>
 
     <!-- Footer -->
-    <footer class="border-t border-[#27272a] py-6 text-center text-[#52525b] text-sm mt-auto">
+    <footer
+      class="border-t border-[#27272a] py-6 text-center text-[#52525b] text-sm mt-auto"
+    >
       <p>Built for the 42 School community.</p>
     </footer>
-
   </body>
 </html>

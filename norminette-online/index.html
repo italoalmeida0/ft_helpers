@@ -6,8 +6,70 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>42 Norminette Online - C Style Checker and Formatter</title>
+    <title>42 Norminette Online – C Style Checker & Auto-Formatter</title>
+    <meta
+      name="description"
+      content="Free online Norminette style checker and auto-formatter for 42 School C code. Check your code against 42 norms, get real-time diagnostics, auto-format, and generate 42 headers — all in your browser."
+    />
+    <meta
+      name="keywords"
+      content="norminette, 42 norminette, 42 school, c style checker, c formatter, 42 header generator, c code linter, 42 norm, 42 coding style, norminette online"
+    />
+    <meta name="author" content="Italo Almeida" />
+    <meta name="robots" content="index, follow" />
+    <link
+      rel="canonical"
+      href="https://italoalmeida0.github.io/ft_helpers/norminette-online/"
+    />
 
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://italoalmeida0.github.io/ft_helpers/norminette-online/"
+    />
+    <meta
+      property="og:title"
+      content="42 Norminette Online – C Style Checker & Auto-Formatter"
+    />
+    <meta
+      property="og:description"
+      content="Free online Norminette style checker and auto-formatter for 42 School C code. Check your code against 42 norms and auto-format directly in your browser."
+    />
+    <meta property="og:site_name" content="ft_helpers" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="42 Norminette Online – C Style Checker & Auto-Formatter"
+    />
+    <meta
+      name="twitter:description"
+      content="Free online Norminette style checker and auto-formatter for 42 School C code. Check your code against 42 norms and auto-format directly in your browser."
+    />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "42 Norminette Online",
+        "url": "https://italoalmeida0.github.io/ft_helpers/norminette-online/",
+        "description": "Free online Norminette style checker and auto-formatter for 42 School C code.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Italo Almeida" }
+      }
+    </script>
+
+    <link
+      rel="icon"
+      href="https://api.iconify.design/material-symbols/rule.svg?color=%23fb923c&height=28"
+      type="image/svg+xml"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -119,12 +181,10 @@
           font-size: 13px;
         }
       }
-
-      </style>
+    </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
     <div id="root" class="h-full flex flex-col overflow-hidden"></div>
-
 
     <script type="module">
       import { ensureInit, format } from "./wasm-formatter.js";
@@ -151,7 +211,12 @@
       import { linter, lintGutter } from "@codemirror/lint";
       import { Prec } from "@codemirror/state";
       import { functionLineCount } from "../functionLineCount.js";
-      import { generate42Header, initPyodide42, insert42HeaderIntoCode, injectShared42Styles } from "../shared42.js";
+      import {
+        generate42Header,
+        initPyodide42,
+        insert42HeaderIntoCode,
+        injectShared42Styles,
+      } from "../shared42.js";
 
       // Inject shared 42 styles
       injectShared42Styles();
@@ -253,8 +318,6 @@
         let pyodide = null;
         let isReady = false;
         let saveTimeout = null;
-
-
 
         const defaultCode = `#include <stdio.h>
 
@@ -384,10 +447,7 @@ int main(){
                 setStatus("ok", "No errors");
                 updateErrorCount(0);
               } else {
-                setStatus(
-                  "has-errors",
-                  `${fileInfo.errors.length} error(s)`,
-                );
+                setStatus("has-errors", `${fileInfo.errors.length} error(s)`);
                 updateErrorCount(fileInfo.errors.length);
               }
 
@@ -413,7 +473,10 @@ int main(){
             setStatus("loading", "Formatting...");
 
             // Step 1: Run wasm clang-format
-            const clangFormatted = window.__ftWasmFormat(code, filename() || "main.c");
+            const clangFormatted = window.__ftWasmFormat(
+              code,
+              filename() || "main.c",
+            );
 
             // Step 2: Run c_formatter_42 Python formatters in Pyodide
             pyodide.globals.set("__ft_code", clangFormatted);
@@ -441,15 +504,26 @@ int main(){
         // Clear code
         // ==========================================
         const resetCode = () => {
-          if (!confirm("Reset code to default? This will overwrite your current code.")) return;
+          if (
+            !confirm(
+              "Reset code to default? This will overwrite your current code.",
+            )
+          )
+            return;
           cmView.dispatch({
-            changes: { from: 0, to: cmView.state.doc.length, insert: defaultCode },
+            changes: {
+              from: 0,
+              to: cmView.state.doc.length,
+              insert: defaultCode,
+            },
           });
           setLintPanelVisible(false);
           setLintPanelHeight(0);
           updateErrorCount(0);
           setFilename("main.c");
-          try { localStorage.setItem(LS_FILENAME_KEY, "main.c"); } catch (e) {}
+          try {
+            localStorage.setItem(LS_FILENAME_KEY, "main.c");
+          } catch (e) {}
           setStatus("ready", "Ready");
         };
 
@@ -579,7 +653,9 @@ int main(){
 
           // Initialize Pyodide + norminette + c_formatter_42 using shared helper
           try {
-            const result = await initPyodide42((state, text) => setStatus(state, text));
+            const result = await initPyodide42((state, text) =>
+              setStatus(state, text),
+            );
             pyodide = result.pyodide;
 
             // Wait for wasm formatter to be ready
@@ -624,9 +700,17 @@ int main(){
               <div class="flex flex-wrap items-center gap-1 md:gap-2 shrink-0 w-full sm:w-auto">
                 {/* Filename (editable with pencil click) */}
                 <Show when={!editingFilename()}>
-                  <span class="text-xs font-semibold text-[#a1a1aa] font-mono editable-filename cursor-pointer" onClick={() => setEditingFilename(true)}>
+                  <span
+                    class="text-xs font-semibold text-[#a1a1aa] font-mono editable-filename cursor-pointer"
+                    onClick={() => setEditingFilename(true)}
+                  >
                     {filename()}
-                    <Icon name="edit" color="a1a1aa" size={12} class="pencil-icon" />
+                    <Icon
+                      name="edit"
+                      color="a1a1aa"
+                      size={12}
+                      class="pencil-icon"
+                    />
                   </span>
                 </Show>
                 <Show when={editingFilename()}>
@@ -635,7 +719,12 @@ int main(){
                     value={filename()}
                     onInput={onFilenameInput}
                     onBlur={() => setEditingFilename(false)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { setEditingFilename(false); e.target.blur(); } }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        setEditingFilename(false);
+                        e.target.blur();
+                      }
+                    }}
                     class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 w-20 md:w-28 font-mono"
                     placeholder="filename.c"
                     autofocus

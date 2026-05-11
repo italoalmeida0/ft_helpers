@@ -2,12 +2,80 @@
 <html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>C Playground - Online Compiler</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>C Playground – Online C Compiler & IDE | Run C in Browser</title>
+    <meta
+      name="description"
+      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. Supports stdin, argv, and 42 School project testing. No installation required."
+    />
+    <meta
+      name="keywords"
+      content="online c compiler, c playground, c online, run c online, compile c in browser, webassembly c compiler, c ide online, 42 school c, learn c programming"
+    />
+    <meta name="author" content="Italo Almeida" />
+    <meta name="robots" content="index, follow" />
+    <link
+      rel="canonical"
+      href="https://italoalmeida0.github.io/ft_helpers/c-playground/"
+    />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:url"
+      content="https://italoalmeida0.github.io/ft_helpers/c-playground/"
+    />
+    <meta
+      property="og:title"
+      content="C Playground – Online C Compiler & IDE | Run C in Browser"
+    />
+    <meta
+      property="og:description"
+      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. No installation required."
+    />
+    <meta property="og:site_name" content="ft_helpers" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="C Playground – Online C Compiler & IDE | Run C in Browser"
+    />
+    <meta
+      name="twitter:description"
+      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. No installation required."
+    />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "C Playground",
+        "url": "https://italoalmeida0.github.io/ft_helpers/c-playground/",
+        "description": "Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly.",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "Italo Almeida" }
+      }
+    </script>
+
+    <link
+      rel="icon"
+      href="https://api.iconify.design/material-symbols/code.svg?color=%2334d399&height=28"
+      type="image/svg+xml"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap"
+      rel="stylesheet"
+    />
 
     <script src="coi-serviceworker.js"></script>
 
@@ -55,7 +123,10 @@
 
     <!-- Wasm formatter (loaded dynamically when Mode 42 is activated) -->
     <script type="module">
-      import { ensureInit, format } from "../norminette-online/wasm-formatter.js";
+      import {
+        ensureInit,
+        format,
+      } from "../norminette-online/wasm-formatter.js";
       window.__ftWasmFormat = format;
       window.__ftWasmFormatInit = ensureInit;
     </script>
@@ -76,41 +147,61 @@
         --color-border-focus: #475569;
         --fullh: 100vh;
       }
-      
-      @supports (height: 100dvh) {
-          :root {
-            --fullh: 100dvh;
-          }
-        }
 
-      
+      @supports (height: 100dvh) {
+        :root {
+          --fullh: 100dvh;
+        }
+      }
+
       body {
         background-color: var(--color-base-100);
         color: var(--color-text-main);
-        font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+        font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
         overscroll-behavior: none;
       }
 
-      body, html {
+      body,
+      html {
         height: var(--fullh);
       }
 
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #52525b;
+      }
 
-      button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+      button {
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
 
       .spinner {
-        border: 2px solid rgba(255,255,255,0.1);
+        border: 2px solid rgba(255, 255, 255, 0.1);
         border-left-color: #fff;
         border-radius: 50%;
         width: 16px;
         height: 16px;
         animation: spin 1s linear infinite;
       }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
 
       /* CodeMirror 6 Custom Overrides */
       .cm-editor {
@@ -120,20 +211,29 @@
         border-radius: 0.5rem;
       }
       .cm-scroller {
-        font-family: 'Courier New', Courier, monospace;
+        font-family: "Courier New", Courier, monospace;
         font-size: 14px;
         overflow: auto;
       }
-      
+
       /* Mobile optimizations for CodeMirror */
       @media (max-width: 768px) {
-        .cm-scroller { font-size: 13px; }
+        .cm-scroller {
+          font-size: 13px;
+        }
       }
 
       /* xterm.js custom scrollbar integration fix */
-      .xterm-viewport::-webkit-scrollbar { width: 6px; }
-      .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
-      .xterm-viewport::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+      .xterm-viewport::-webkit-scrollbar {
+        width: 6px;
+      }
+      .xterm-viewport::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .xterm-viewport::-webkit-scrollbar-thumb {
+        background: #3f3f46;
+        border-radius: 3px;
+      }
 
       /* Terminal scroll buttons */
       .term-scroll-btn {
@@ -155,13 +255,22 @@
   <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
     <script>
       const url = new URL(window.location.href);
-      if (!url.pathname.endsWith('/')) 
-        window.location.replace(`${url.origin}${url.pathname}/${url.hash ? url.hash : ''}`);
+      if (!url.pathname.endsWith("/"))
+        window.location.replace(
+          `${url.origin}${url.pathname}/${url.hash ? url.hash : ""}`,
+        );
     </script>
     <div id="root" class="h-full relative"></div>
 
     <script type="text/babel" data-type="module" data-presets="solid">
-      import { createSignal, createMemo, Show, onMount, onCleanup, For } from "solid-js";
+      import {
+        createSignal,
+        createMemo,
+        Show,
+        onMount,
+        onCleanup,
+        For,
+      } from "solid-js";
       import { render } from "solid-js/web";
       import { Terminal } from "@xterm/xterm";
       import { FitAddon } from "@xterm/addon-fit";
@@ -173,12 +282,17 @@
       import { basicSetup } from "codemirror";
       import { cpp } from "@codemirror/lang-cpp";
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
-      import { indentationMarkers } from '@replit/codemirror-indentation-markers';
+      import { indentationMarkers } from "@replit/codemirror-indentation-markers";
       import { insertTab, indentLess } from "@codemirror/commands";
-      import { Prec, Compartment } from '@codemirror/state';
+      import { Prec, Compartment } from "@codemirror/state";
       import { linter, lintGutter } from "@codemirror/lint";
       import { functionLineCount } from "../functionLineCount.js";
-      import { generate42Header, initPyodide42, insert42HeaderIntoCode, injectShared42Styles } from "../shared42.js";
+      import {
+        generate42Header,
+        initPyodide42,
+        insert42HeaderIntoCode,
+        injectShared42Styles,
+      } from "../shared42.js";
 
       // Inject shared 42 styles
       injectShared42Styles();
@@ -240,9 +354,11 @@
             // Wait until worker is ready for data
             while (true) {
               const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
-              if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
-              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
-              await new Promise(r => setTimeout(r, 2));
+              if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK)
+                break;
+              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL)
+                return;
+              await new Promise((r) => setTimeout(r, 2));
             }
 
             // Write chunk
@@ -255,15 +371,20 @@
             offset += chunkLen;
 
             Atomics.store(this.int32, STDIN_LEN_OFFSET / 4, chunkLen);
-            Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_DATA_READY);
+            Atomics.store(
+              this.int32,
+              STDIN_STATE_OFFSET / 4,
+              STDIN_STATE_DATA_READY,
+            );
             Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
 
             // Wait for ACK
             while (true) {
               const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
               if (state === STDIN_STATE_ACK) break;
-              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
-              await new Promise(r => setTimeout(r, 2));
+              if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL)
+                return;
+              await new Promise((r) => setTimeout(r, 2));
             }
 
             // Reset to IDLE
@@ -278,8 +399,9 @@
           while (true) {
             const state = Atomics.load(this.int32, STDIN_STATE_OFFSET / 4);
             if (state === STDIN_STATE_IDLE || state === STDIN_STATE_ACK) break;
-            if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL) return;
-            await new Promise(r => setTimeout(r, 2));
+            if (state === STDIN_STATE_EOF || state === STDIN_STATE_CANCEL)
+              return;
+            await new Promise((r) => setTimeout(r, 2));
           }
           Atomics.store(this.int32, STDIN_STATE_OFFSET / 4, STDIN_STATE_EOF);
           Atomics.notify(this.int32, STDIN_STATE_OFFSET / 4);
@@ -323,13 +445,19 @@
         }
 
         _initWorker() {
-          this.worker = new Worker('compiler-worker.js');
+          this.worker = new Worker("compiler-worker.js");
           const channel = new MessageChannel();
           this.port = channel.port1;
           this.port.onmessage = this.onmessage.bind(this);
 
           const remotePort = channel.port2;
-          this.worker.postMessage({ id: 'constructor', data: { port: remotePort, binaries: this.binaries } }, [remotePort]);
+          this.worker.postMessage(
+            {
+              id: "constructor",
+              data: { port: remotePort, binaries: this.binaries },
+            },
+            [remotePort],
+          );
         }
 
         terminate() {
@@ -350,7 +478,10 @@
           const responsePromise = new Promise((resolve, reject) => {
             this.responseCBs.set(responseId, { resolve, reject });
           });
-          this.port.postMessage({ id, responseId, data: options }, transferables || []);
+          this.port.postMessage(
+            { id, responseId, data: options },
+            transferables || [],
+          );
           return await responsePromise;
         }
 
@@ -359,26 +490,26 @@
           if (stdinSAB) {
             data.stdinSAB = stdinSAB;
             // SharedArrayBuffer is SHARED, not transferred — both threads keep access
-            return this.runAsync('compileAndRun', data);
+            return this.runAsync("compileAndRun", data);
           }
-          return this.runAsync('compileAndRun', data);
+          return this.runAsync("compileAndRun", data);
         }
 
         cancelRun() {
-          this.port.postMessage({ id: 'cancelRun' });
+          this.port.postMessage({ id: "cancelRun" });
         }
 
         stdinEOF() {
-          this.port.postMessage({ id: 'stdinEOF' });
+          this.port.postMessage({ id: "stdinEOF" });
         }
 
         onmessage(event) {
           switch (event.data.id) {
-            case 'write':
+            case "write":
               if (this.onWrite) this.onWrite(event.data.data);
               break;
 
-            case 'runAsync': {
+            case "runAsync": {
               const responseId = event.data.responseId;
               const promise = this.responseCBs.get(responseId);
               if (promise) {
@@ -393,17 +524,17 @@
 
       async function loadWasmClangBinaries() {
         const files = [
-          { name: 'clang', url: '../clang' },
-          { name: 'lld', url: '../lld' },
-          { name: 'memfs', url: '../memfs' },
-          { name: 'sysroot', url: '../sysroot.tar' },
+          { name: "clang", url: "../clang" },
+          { name: "lld", url: "../lld" },
+          { name: "memfs", url: "../memfs" },
+          { name: "sysroot", url: "../sysroot.tar" },
         ];
         const binaries = {};
         for (const f of files) {
           const buf = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
-            xhr.open('GET', f.url + '?t=' + Date.now(), true);
-            xhr.responseType = 'arraybuffer';
+            xhr.open("GET", f.url + "?t=" + Date.now(), true);
+            xhr.responseType = "arraybuffer";
             xhr.onload = () => {
               if (xhr.status === 200) {
                 resolve(xhr.response);
@@ -411,7 +542,8 @@
                 reject(new Error(`Failed to load ${f.url}: ${xhr.status}`));
               }
             };
-            xhr.onerror = () => reject(new Error(`Network error loading ${f.url}`));
+            xhr.onerror = () =>
+              reject(new Error(`Network error loading ${f.url}`));
             xhr.send();
           });
           binaries[f.name] = buf;
@@ -509,7 +641,7 @@ int main()
 }
 `;
 
-        const LOCAL_STORAGE_KEY = 'c_playground_code';
+        const LOCAL_STORAGE_KEY = "c_playground_code";
 
         // ==========================================
         // SHARE VIA URL HASH (no backend)
@@ -517,27 +649,30 @@ int main()
         // ==========================================
         const compressToHash = async (code) => {
           const blob = new Blob([code]);
-          const cs = new CompressionStream('gzip');
+          const cs = new CompressionStream("gzip");
           const stream = blob.stream().pipeThrough(cs);
           const compressed = await new Response(stream).arrayBuffer();
           const bytes = new Uint8Array(compressed);
-          let binary = '';
+          let binary = "";
           for (let i = 0; i < bytes.length; i++) {
             binary += String.fromCharCode(bytes[i]);
           }
-          return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          return btoa(binary)
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
         };
 
         const decompressFromHash = async (hashStr) => {
-          const base64 = hashStr.replace(/-/g, '+').replace(/_/g, '/');
-          const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+          const base64 = hashStr.replace(/-/g, "+").replace(/_/g, "/");
+          const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
           const binary = atob(padded);
           const bytes = new Uint8Array(binary.length);
           for (let i = 0; i < binary.length; i++) {
             bytes[i] = binary.charCodeAt(i);
           }
           const blob = new Blob([bytes]);
-          const ds = new DecompressionStream('gzip');
+          const ds = new DecompressionStream("gzip");
           const stream = blob.stream().pipeThrough(ds);
           return await new Response(stream).text();
         };
@@ -548,7 +683,7 @@ int main()
           try {
             return await decompressFromHash(hash);
           } catch (e) {
-            console.warn('Failed to decode hash:', e);
+            console.warn("Failed to decode hash:", e);
             return null;
           }
         };
@@ -556,16 +691,20 @@ int main()
         const shareCode = async () => {
           try {
             const compressed = await compressToHash(scriptCode());
-            const url = window.location.origin + window.location.pathname + '#' + compressed;
+            const url =
+              window.location.origin +
+              window.location.pathname +
+              "#" +
+              compressed;
             await navigator.clipboard.writeText(url);
-            setShareStatus('copied');
-            setTimeout(() => setShareStatus('idle'), 2000);
+            setShareStatus("copied");
+            setTimeout(() => setShareStatus("idle"), 2000);
           } catch (e) {
             // Fallback: change the URL hash directly
             const compressed = await compressToHash(scriptCode());
             window.location.hash = compressed;
-            setShareStatus('copied');
-            setTimeout(() => setShareStatus('idle'), 2000);
+            setShareStatus("copied");
+            setTimeout(() => setShareStatus("idle"), 2000);
           }
         };
 
@@ -575,10 +714,18 @@ int main()
         // MODE 42 STATE
         // ==========================================
         const loadMode42Saved = () => {
-          try { return localStorage.getItem('c_playground_mode42') === '1'; } catch (e) { return false; }
+          try {
+            return localStorage.getItem("c_playground_mode42") === "1";
+          } catch (e) {
+            return false;
+          }
         };
         const loadFilenameSaved = () => {
-          try { return localStorage.getItem('c_playground_filename') || 'main.c'; } catch (e) { return 'main.c'; }
+          try {
+            return localStorage.getItem("c_playground_filename") || "main.c";
+          } catch (e) {
+            return "main.c";
+          }
         };
 
         const [mode42, setMode42] = createSignal(loadMode42Saved());
@@ -587,13 +734,17 @@ int main()
         const [mode42ErrorCount, setMode42ErrorCount] = createSignal(0);
         const [mode42ErrorColor, setMode42ErrorColor] = createSignal("#52525b");
         const [mode42LintResults, setMode42LintResults] = createSignal([]);
-        const [mode42LintPanelVisible, setMode42LintPanelVisible] = createSignal(false);
-        const [mode42LintPanelHeight, setMode42LintPanelHeight] = createSignal(0);
+        const [mode42LintPanelVisible, setMode42LintPanelVisible] =
+          createSignal(false);
+        const [mode42LintPanelHeight, setMode42LintPanelHeight] =
+          createSignal(0);
         const [mode42ModalVisible, setMode42ModalVisible] = createSignal(false);
         const [mode42ModalUser, setMode42ModalUser] = createSignal("");
         const [mode42ModalEmail, setMode42ModalEmail] = createSignal("");
-        const [codeFilename, setCodeFilename] = createSignal(loadFilenameSaved());
-        const [mode42FormatterReady, setMode42FormatterReady] = createSignal(false);
+        const [codeFilename, setCodeFilename] =
+          createSignal(loadFilenameSaved());
+        const [mode42FormatterReady, setMode42FormatterReady] =
+          createSignal(false);
         const [editingFilename, setEditingFilename] = createSignal(false);
 
         let pyodide42 = null;
@@ -626,54 +777,77 @@ int main()
         // ==========================================
         // NORMINETTE LINTER (only active in mode 42)
         // ==========================================
-        const createNorminetteLinter = () => linter(
-          async (view) => {
-            if (!mode42Ready || !pyodide42) return [];
-            const code = view.state.doc.toString();
-            if (!code.trim()) return [];
-            const fn = codeFilename() || "main.c";
-            try {
-              pyodide42.globals.set("source_code", code);
-              pyodide42.globals.set("file_name", fn);
-              const resultJson = await pyodide42.runPython("run_norminette(source_code, file_name)");
-              const result = JSON.parse(resultJson);
-              const fileInfo = result.files[0];
-              const lintErrors = [];
-              const diagnostics = [];
-              for (const err of fileInfo.errors) {
-                const hl = err.highlights[0];
-                if (!hl) continue;
-                const lineno = Math.max(1, Math.min(hl.lineno, view.state.doc.lines));
-                const line = view.state.doc.line(lineno);
-                const from = line.from + Math.max(0, hl.column - 1);
-                const to = Math.min(from + (hl.length || 1), line.to);
-                diagnostics.push({ from, to, severity: err.level === "Notice" ? "warning" : "error", message: `${err.name}: ${err.text}`, source: "norminette" });
-                lintErrors.push({ lineno: hl.lineno, column: hl.column, level: err.level, name: err.name, text: err.text });
+        const createNorminetteLinter = () =>
+          linter(
+            async (view) => {
+              if (!mode42Ready || !pyodide42) return [];
+              const code = view.state.doc.toString();
+              if (!code.trim()) return [];
+              const fn = codeFilename() || "main.c";
+              try {
+                pyodide42.globals.set("source_code", code);
+                pyodide42.globals.set("file_name", fn);
+                const resultJson = await pyodide42.runPython(
+                  "run_norminette(source_code, file_name)",
+                );
+                const result = JSON.parse(resultJson);
+                const fileInfo = result.files[0];
+                const lintErrors = [];
+                const diagnostics = [];
+                for (const err of fileInfo.errors) {
+                  const hl = err.highlights[0];
+                  if (!hl) continue;
+                  const lineno = Math.max(
+                    1,
+                    Math.min(hl.lineno, view.state.doc.lines),
+                  );
+                  const line = view.state.doc.line(lineno);
+                  const from = line.from + Math.max(0, hl.column - 1);
+                  const to = Math.min(from + (hl.length || 1), line.to);
+                  diagnostics.push({
+                    from,
+                    to,
+                    severity: err.level === "Notice" ? "warning" : "error",
+                    message: `${err.name}: ${err.text}`,
+                    source: "norminette",
+                  });
+                  lintErrors.push({
+                    lineno: hl.lineno,
+                    column: hl.column,
+                    level: err.level,
+                    name: err.name,
+                    text: err.text,
+                  });
+                }
+                if (fileInfo.status === "OK") {
+                  set42Status("ok", "No errors");
+                  update42ErrorCount(0);
+                } else {
+                  set42Status(
+                    "has-errors",
+                    `${fileInfo.errors.length} error(s)`,
+                  );
+                  update42ErrorCount(fileInfo.errors.length);
+                }
+                // Update lint panel
+                if (lintErrors.length === 0) {
+                  setMode42LintPanelVisible(false);
+                  setMode42LintPanelHeight(0);
+                } else {
+                  setMode42LintPanelVisible(true);
+                  setMode42LintPanelHeight(
+                    Math.min(200, Math.max(80, lintErrors.length * 30)),
+                  );
+                }
+                setMode42LintResults(lintErrors);
+                return diagnostics;
+              } catch (err) {
+                console.error("Norminette lint error:", err);
+                return [];
               }
-              if (fileInfo.status === "OK") {
-                set42Status("ok", "No errors");
-                update42ErrorCount(0);
-              } else {
-                set42Status("has-errors", `${fileInfo.errors.length} error(s)`);
-                update42ErrorCount(fileInfo.errors.length);
-              }
-              // Update lint panel
-              if (lintErrors.length === 0) {
-                setMode42LintPanelVisible(false);
-                setMode42LintPanelHeight(0);
-              } else {
-                setMode42LintPanelVisible(true);
-                setMode42LintPanelHeight(Math.min(200, Math.max(80, lintErrors.length * 30)));
-              }
-              setMode42LintResults(lintErrors);
-              return diagnostics;
-            } catch (err) {
-              console.error("Norminette lint error:", err);
-              return [];
-            }
-          },
-          { delay: 750 },
-        );
+            },
+            { delay: 750 },
+          );
 
         // ==========================================
         // FORMAT CODE (mode 42)
@@ -684,11 +858,20 @@ int main()
           if (!code.trim()) return;
           try {
             set42Status("loading", "Formatting...");
-            const clangFormatted = window.__ftWasmFormat(code, codeFilename() || "main.c");
+            const clangFormatted = window.__ftWasmFormat(
+              code,
+              codeFilename() || "main.c",
+            );
             pyodide42.globals.set("__ft_code", clangFormatted);
             const pyFormatted = await pyodide42.runPython("run_all(__ft_code)");
             if (pyFormatted && pyFormatted !== code) {
-              cmInstance.dispatch({ changes: { from: 0, to: cmInstance.state.doc.length, insert: pyFormatted } });
+              cmInstance.dispatch({
+                changes: {
+                  from: 0,
+                  to: cmInstance.state.doc.length,
+                  insert: pyFormatted,
+                },
+              });
               set42Status("ready", "Formatted");
             } else {
               set42Status("ready", "Already formatted");
@@ -733,14 +916,26 @@ int main()
           const fn = codeFilename().trim() || "main.c";
           const currentCode = cmInstance.state.doc.toString();
           const newCode = insert42HeaderIntoCode(currentCode, fn, user, email);
-          cmInstance.dispatch({ changes: { from: 0, to: cmInstance.state.doc.length, insert: newCode } });
+          cmInstance.dispatch({
+            changes: {
+              from: 0,
+              to: cmInstance.state.doc.length,
+              insert: newCode,
+            },
+          });
           set42Status("ready", "42 header inserted");
         };
 
         const onLintItemClick42 = (line, col) => {
           if (cmInstance && line > 0) {
-            const pos = cmInstance.state.doc.line(Math.min(line, cmInstance.state.doc.lines)).from + Math.max(0, col - 1);
-            cmInstance.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+            const pos =
+              cmInstance.state.doc.line(
+                Math.min(line, cmInstance.state.doc.lines),
+              ).from + Math.max(0, col - 1);
+            cmInstance.dispatch({
+              selection: { anchor: pos },
+              scrollIntoView: true,
+            });
             cmInstance.focus();
           }
         };
@@ -751,7 +946,9 @@ int main()
         const toggleMode42 = async () => {
           const next = !mode42();
           setMode42(next);
-          try { localStorage.setItem('c_playground_mode42', next ? '1' : '0'); } catch (e) {}
+          try {
+            localStorage.setItem("c_playground_mode42", next ? "1" : "0");
+          } catch (e) {}
 
           if (next) {
             // Activate Mode 42: add lint + line count extensions
@@ -759,7 +956,10 @@ int main()
               mode42LinterRef = createNorminetteLinter();
               cmInstance.dispatch({
                 effects: [
-                  mode42LintCompartment.reconfigure([mode42LinterRef, lintGutter()]),
+                  mode42LintCompartment.reconfigure([
+                    mode42LinterRef,
+                    lintGutter(),
+                  ]),
                   mode42LineCountCompartment.reconfigure(functionLineCount()),
                 ],
               });
@@ -769,7 +969,9 @@ int main()
             if (!pyodide42) {
               set42Status("loading", "Loading norminette...");
               try {
-                const result = await initPyodide42((state, text) => set42Status(state, text));
+                const result = await initPyodide42((state, text) =>
+                  set42Status(state, text),
+                );
                 pyodide42 = result.pyodide;
                 mode42Ready = true;
                 setMode42FormatterReady(true);
@@ -811,14 +1013,14 @@ int main()
             return defaultCode;
           }
         };
-        
+
         const [scriptCode, setScriptCode] = createSignal(loadSavedCode());
         const [argvInput, setArgvInput] = createSignal("hello 42 world");
         const [stdinInput, setStdinInput] = createSignal("");
         const [activeTab, setActiveTab] = createSignal("terminal"); // 'terminal' | 'stdin'
 
         // Line buffer for canonical (cooked) mode editing
-        let _lineBuffer = '';
+        let _lineBuffer = "";
 
         // Handle terminal input during interactive mode
         // Implements canonical mode: line editing (backspace) + send on Enter
@@ -831,7 +1033,7 @@ int main()
             // Ctrl+C (0x03) - terminate program
             if (code === 3) {
               termInstance.writeln("^C");
-              _lineBuffer = '';
+              _lineBuffer = "";
               stopProgram();
               return;
             }
@@ -839,7 +1041,7 @@ int main()
             // Ctrl+D (0x04) - send EOF
             if (code === 4) {
               termInstance.writeln("^D");
-              _lineBuffer = '';
+              _lineBuffer = "";
               stdinPipeWriter.writeEOF().catch(() => {});
               return;
             }
@@ -848,8 +1050,8 @@ int main()
             if (code === 0x15) {
               if (_lineBuffer.length > 0) {
                 // Move cursor back, erase with spaces, move cursor back again
-                termInstance.write('\b \b'.repeat(_lineBuffer.length));
-                _lineBuffer = '';
+                termInstance.write("\b \b".repeat(_lineBuffer.length));
+                _lineBuffer = "";
               }
               continue;
             }
@@ -857,33 +1059,41 @@ int main()
             // Ctrl+W (0x17) - delete word backwards
             if (code === 0x17) {
               // Trim trailing spaces, then find last word boundary
-              let trimmed = _lineBuffer.replace(/\s+$/, '');
-              const deleteCount = _lineBuffer.length - trimmed.length + (trimmed.match(/\s\S*$/) ? trimmed.match(/\s\S*$/)[0].length : trimmed.length);
+              let trimmed = _lineBuffer.replace(/\s+$/, "");
+              const deleteCount =
+                _lineBuffer.length -
+                trimmed.length +
+                (trimmed.match(/\s\S*$/)
+                  ? trimmed.match(/\s\S*$/)[0].length
+                  : trimmed.length);
               if (deleteCount > 0) {
-                termInstance.write('\b \b'.repeat(deleteCount));
-                _lineBuffer = _lineBuffer.substring(0, _lineBuffer.length - deleteCount);
+                termInstance.write("\b \b".repeat(deleteCount));
+                _lineBuffer = _lineBuffer.substring(
+                  0,
+                  _lineBuffer.length - deleteCount,
+                );
               }
               continue;
             }
 
             // Backspace (0x7F) or DEL (0x08) - delete last character
-            if (code === 0x7F || code === 0x08) {
+            if (code === 0x7f || code === 0x08) {
               if (_lineBuffer.length > 0) {
                 // Remove last character from buffer
                 // Handle multi-byte: remove last code point
-                _lineBuffer = [..._lineBuffer].slice(0, -1).join('');
+                _lineBuffer = [..._lineBuffer].slice(0, -1).join("");
                 // Erase on terminal: move back, write space, move back
-                termInstance.write('\b \b');
+                termInstance.write("\b \b");
               }
               continue;
             }
 
             // Enter / Return (0x0D) - flush line buffer to program
-            if (code === 0x0D) {
-              const line = _lineBuffer + '\n';
-              _lineBuffer = '';
+            if (code === 0x0d) {
+              const line = _lineBuffer + "\n";
+              _lineBuffer = "";
               // Echo newline to terminal
-              termInstance.write('\r\n');
+              termInstance.write("\r\n");
               // Send the complete line to the program
               stdinPipeWriter.write(line).catch(() => {});
               continue;
@@ -929,17 +1139,17 @@ int main()
                 Prec.highest(
                   keymap.of([
                     {
-                      key: 'Mod-s',
+                      key: "Mod-s",
                       run: () => ({}),
                     },
-                  ])
+                  ]),
                 ),
                 EditorView.updateListener.of((update) => {
                   if (update.docChanged) {
                     const newCode = update.state.doc.toString();
                     setScriptCode(newCode);
                     setExecutionError(null);
-                    
+
                     // Debounce save to localStorage (1 second)
                     if (saveTimeout) clearTimeout(saveTimeout);
                     saveTimeout = setTimeout(() => {
@@ -948,15 +1158,15 @@ int main()
                       } catch (e) {}
                     }, 1000);
                   }
-                })
+                }),
               ],
-              parent: codeEditorRef
+              parent: codeEditorRef,
             });
           }
 
           // Initialize xterm.js
           termInstance = new Terminal({
-            theme: { background: '#09090b', foreground: '#d4d4d8' },
+            theme: { background: "#09090b", foreground: "#d4d4d8" },
             fontFamily: "'Courier New', Courier, monospace",
             fontSize: 13,
             cursorBlink: true,
@@ -972,11 +1182,15 @@ int main()
           if (terminalRef) {
             termInstance.open(terminalRef);
             requestAnimationFrame(() => {
-              try { fitAddon.fit(); } catch(e) {}
+              try {
+                fitAddon.fit();
+              } catch (e) {}
             });
 
             const resizeObserver = new ResizeObserver(() => {
-              try { fitAddon.fit(); } catch(e) {}
+              try {
+                fitAddon.fit();
+              } catch (e) {}
             });
             resizeObserver.observe(terminalRef);
           }
@@ -988,11 +1202,15 @@ int main()
               if (termInstance) termInstance.write(data);
             }, binaries);
             termInstance.clear();
-            termInstance.writeln("\x1b[36mCompiler loaded successfully.\x1b[0m");
+            termInstance.writeln(
+              "\x1b[36mCompiler loaded successfully.\x1b[0m",
+            );
             setCompilerReady(true);
           } catch (err) {
             termInstance.clear();
-            termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
+            termInstance.writeln(
+              `\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`,
+            );
           }
 
           // Auto-activate Mode 42 if it was saved in localStorage
@@ -1010,7 +1228,7 @@ int main()
 
         const stopProgram = () => {
           if (appState() !== "RUNNING" && appState() !== "COMPILING") return;
-          
+
           // First try graceful cancellation via stdin pipe
           if (stdinPipeWriter) {
             stdinPipeWriter.cancel();
@@ -1054,8 +1272,8 @@ int main()
           try {
             const args = argvInput()
               .split(/\s+/)
-              .map(s => s.trim())
-              .filter(s => s.length > 0);
+              .map((s) => s.trim())
+              .filter((s) => s.length > 0);
 
             setStatusMessage("Compiling...");
             termInstance.writeln("\x1b[34mCompiling and running...\x1b[0m\n");
@@ -1067,7 +1285,7 @@ int main()
               stdinSAB = sab;
               stdinPipeWriter = new StdinPipeWriter(sab);
               stdinPipeWriter.reset();
-              _lineBuffer = '';
+              _lineBuffer = "";
             }
 
             // Set up terminal input listener for interactive mode
@@ -1078,7 +1296,12 @@ int main()
             setAppState("RUNNING");
             setStatusMessage("Running...");
 
-            const result = await compilerApi.compileAndRun(scriptCode(), args, stdinInput(), sab);
+            const result = await compilerApi.compileAndRun(
+              scriptCode(),
+              args,
+              stdinInput(),
+              sab,
+            );
 
             if (result.error) {
               throw new Error(result.error);
@@ -1086,7 +1309,7 @@ int main()
 
             termInstance.writeln("\n\x1b[32mProgram finished.\x1b[0m");
           } catch (err) {
-            if (err.message !== 'Program terminated by user') {
+            if (err.message !== "Program terminated by user") {
               setExecutionError(err.message);
               termInstance.writeln(`\n\x1b[31m${err.message}\x1b[0m`);
             }
@@ -1105,14 +1328,18 @@ int main()
         };
 
         const resetCode = () => {
-          if (confirm('Reset code to default? This will overwrite your current code.')) {
+          if (
+            confirm(
+              "Reset code to default? This will overwrite your current code.",
+            )
+          ) {
             if (cmInstance) {
               cmInstance.dispatch({
                 changes: {
                   from: 0,
                   to: cmInstance.state.doc.length,
-                  insert: defaultCode
-                }
+                  insert: defaultCode,
+                },
               });
               setScriptCode(defaultCode);
             }
@@ -1120,7 +1347,7 @@ int main()
             forceLint();
             try {
               localStorage.removeItem(LOCAL_STORAGE_KEY);
-              localStorage.setItem('c_playground_filename', 'main.c');
+              localStorage.setItem("c_playground_filename", "main.c");
             } catch (e) {}
           }
         };
@@ -1145,37 +1372,57 @@ int main()
                   <Icon name="code" color="34d399" size={20} />
                 </div>
                 <div class="min-w-0">
-                  <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">C Playground</h1>
-                  <p class="text-[10px] md:text-xs text-[#52525b] hidden sm:block">Compile & run C in your browser</p>
+                  <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">
+                    C Playground
+                  </h1>
+                  <p class="text-[10px] md:text-xs text-[#52525b] hidden sm:block">
+                    Compile & run C in your browser
+                  </p>
                 </div>
               </div>
 
               <div class="flex items-center space-x-1 md:space-x-2 shrink-0">
-
                 {/* Mode 42 Toggle */}
                 <div
                   class="mode42-toggle"
                   onClick={toggleMode42}
-                  title={mode42() ? "Mode 42 School ON — click to disable" : "Mode 42 OFF — click to enable norminette + formatter"}
+                  title={
+                    mode42()
+                      ? "Mode 42 School ON — click to disable"
+                      : "Mode 42 OFF — click to enable norminette + formatter"
+                  }
                 >
-                  <span class={`text-[10px] font-bold uppercase tracking-wider ${mode42() ? 'text-orange-400' : 'text-[#52525b]'}`}>42 School</span>
-                  <div class={`mode42-toggle-track ${mode42() ? 'active' : ''}`}>
+                  <span
+                    class={`text-[10px] font-bold uppercase tracking-wider ${mode42() ? "text-orange-400" : "text-[#52525b]"}`}
+                  >
+                    42 School
+                  </span>
+                  <div
+                    class={`mode42-toggle-track ${mode42() ? "active" : ""}`}
+                  >
                     <div class="mode42-toggle-thumb"></div>
                   </div>
                 </div>
 
                 <button
                   onClick={shareCode}
-                  class={`p-2 rounded-lg transition-colors flex ${shareStatus() === 'copied' ? 'bg-emerald-600 text-white' : 'bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa]'}`}
-                  title={shareStatus() === 'copied' ? 'Link copied!' : 'Share Code'}
+                  class={`p-2 rounded-lg transition-colors flex ${shareStatus() === "copied" ? "bg-emerald-600 text-white" : "bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa]"}`}
+                  title={
+                    shareStatus() === "copied" ? "Link copied!" : "Share Code"
+                  }
                 >
-                  <Show when={shareStatus() === 'copied'} fallback={<Icon name="share" size={18} />}>
+                  <Show
+                    when={shareStatus() === "copied"}
+                    fallback={<Icon name="share" size={18} />}
+                  >
                     <Icon name="check" color="ffffff" size={18} />
                   </Show>
                 </button>
                 <button
                   onClick={resetCode}
-                  disabled={appState() === "COMPILING" || appState() === "RUNNING"}
+                  disabled={
+                    appState() === "COMPILING" || appState() === "RUNNING"
+                  }
                   class="p-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] transition-colors flex disabled:opacity-50"
                   title="Reset Code"
                 >
@@ -1195,16 +1442,30 @@ int main()
                     onClick={runProgram}
                     disabled={appState() === "COMPILING" || !compilerReady()}
                     class="flex items-center rounded-lg transition-colors p-2 disabled:opacity-50 bg-emerald-600 hover:bg-emerald-500 text-white shrink-0"
-                    title={!compilerReady() ? "Loading compiler..." : "Run Program"}
+                    title={
+                      !compilerReady() ? "Loading compiler..." : "Run Program"
+                    }
                   >
-                    <Show when={appState() === "COMPILING"} fallback={<Icon name="play-arrow" color="ffffff" size={16} />}>
-                      <div class="spinner" style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.2)', 'border-left-color': '#fff' }}></div>
+                    <Show
+                      when={appState() === "COMPILING"}
+                      fallback={
+                        <Icon name="play-arrow" color="ffffff" size={16} />
+                      }
+                    >
+                      <div
+                        class="spinner"
+                        style={{
+                          width: "14px",
+                          height: "14px",
+                          border: "2px solid rgba(255,255,255,0.2)",
+                          "border-left-color": "#fff",
+                        }}
+                      ></div>
                     </Show>
                   </button>
                 </Show>
               </div>
             </header>
-
 
             {/* Main Content */}
             <div class="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
@@ -1212,9 +1473,17 @@ int main()
               <div class="flex-1 flex flex-col min-h-0 min-w-0">
                 <div class="flex items-center px-3 py-1.5 md:px-4 md:py-2 bg-[#09090b] border-b border-[#27272a] shrink-0 gap-1">
                   <Show when={!editingFilename()}>
-                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider editable-filename" onClick={() => setEditingFilename(true)}>
+                    <span
+                      class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider editable-filename"
+                      onClick={() => setEditingFilename(true)}
+                    >
                       {codeFilename()}
-                      <Icon name="edit" color="52525b" size={12} class="pencil-icon" />
+                      <Icon
+                        name="edit"
+                        color="52525b"
+                        size={12}
+                        class="pencil-icon"
+                      />
                     </span>
                   </Show>
                   <Show when={editingFilename()}>
@@ -1224,10 +1493,20 @@ int main()
                       onInput={(e) => {
                         setCodeFilename(e.target.value);
                         forceLint();
-                        try { localStorage.setItem('c_playground_filename', e.target.value); } catch (e) {}
+                        try {
+                          localStorage.setItem(
+                            "c_playground_filename",
+                            e.target.value,
+                          );
+                        } catch (e) {}
                       }}
                       onBlur={() => setEditingFilename(false)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { setEditingFilename(false); e.target.blur(); } }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          setEditingFilename(false);
+                          e.target.blur();
+                        }
+                      }}
                       class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-orange-500 w-24 md:w-32 font-mono"
                       placeholder="main.c"
                       autofocus
@@ -1250,9 +1529,17 @@ int main()
                       onClick={formatCode42}
                       disabled={!mode42FormatterReady()}
                       class="flex items-center rounded-lg transition-colors px-2.5 py-1 disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500 text-white text-[10px] md:text-xs font-semibold gap-1 shrink-0"
-                      title={mode42FormatterReady() ? "Format code (42 style)" : "Formatter loading..."}
+                      title={
+                        mode42FormatterReady()
+                          ? "Format code (42 style)"
+                          : "Formatter loading..."
+                      }
                     >
-                      <Icon name="format-line-spacing" color="ffffff" size={12} />
+                      <Icon
+                        name="format-line-spacing"
+                        color="ffffff"
+                        size={12}
+                      />
                       <span>Format</span>
                     </button>
                   </div>
@@ -1269,14 +1556,21 @@ int main()
                   >
                     <For each={mode42LintResults()}>
                       {(err) => {
-                        const severityClass = err.level === "Notice" ? "notice" : "error";
+                        const severityClass =
+                          err.level === "Notice" ? "notice" : "error";
                         return (
                           <div
                             class="lint-panel-item"
-                            onClick={() => onLintItemClick42(err.lineno, err.column)}
+                            onClick={() =>
+                              onLintItemClick42(err.lineno, err.column)
+                            }
                           >
-                            <span class="lint-line">L{err.lineno}:C{err.column}</span>
-                            <span class={`lint-severity ${severityClass}`}>{err.level}</span>
+                            <span class="lint-line">
+                              L{err.lineno}:C{err.column}
+                            </span>
+                            <span class={`lint-severity ${severityClass}`}>
+                              {err.level}
+                            </span>
                             <span class="lint-name">{err.name}</span>
                             <span class="lint-text">{err.text}</span>
                           </div>
@@ -1306,9 +1600,13 @@ int main()
                 </div>
 
                 {/* Terminal */}
-                <div class={`flex-1 flex flex-col min-h-0 ${activeTab() === "terminal" ? "flex" : "hidden md:flex"}`}>
+                <div
+                  class={`flex-1 flex flex-col min-h-0 ${activeTab() === "terminal" ? "flex" : "hidden md:flex"}`}
+                >
                   <div class="hidden md:flex items-center justify-between px-3 py-1.5 md:px-4 md:py-2 border-b border-[#27272a] shrink-0">
-                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider">Terminal</span>
+                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider">
+                      Terminal
+                    </span>
                     <Show when={appState() === "RUNNING"}>
                       <span class="text-[10px] md:text-xs font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
                         <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
@@ -1325,7 +1623,10 @@ int main()
                     </div>
                   </Show>
                   <div class="flex-1 relative overflow-hidden p-1 md:p-2">
-                    <div ref={terminalRef} class="absolute inset-1 md:inset-2"></div>
+                    <div
+                      ref={terminalRef}
+                      class="absolute inset-1 md:inset-2"
+                    ></div>
                   </div>
                   {/* Scroll buttons for mobile */}
                   <div class="flex md:hidden mx-1 mb-1 gap-2">
@@ -1335,19 +1636,33 @@ int main()
                       onMouseDown={() => {
                         if (!termInstance) return;
                         termInstance.scrollLines(-5);
-                        const iv = setInterval(() => termInstance.scrollLines(-5), 80);
-                        const stop = () => { clearInterval(iv); document.removeEventListener('mouseup', stop); document.removeEventListener('mouseleave', stop); };
-                        document.addEventListener('mouseup', stop);
-                        document.addEventListener('mouseleave', stop);
+                        const iv = setInterval(
+                          () => termInstance.scrollLines(-5),
+                          80,
+                        );
+                        const stop = () => {
+                          clearInterval(iv);
+                          document.removeEventListener("mouseup", stop);
+                          document.removeEventListener("mouseleave", stop);
+                        };
+                        document.addEventListener("mouseup", stop);
+                        document.addEventListener("mouseleave", stop);
                       }}
                       onTouchStart={(e) => {
                         e.preventDefault();
                         if (!termInstance) return;
                         termInstance.scrollLines(-5);
-                        const iv = setInterval(() => termInstance.scrollLines(-5), 80);
-                        const stop = () => { clearInterval(iv); document.removeEventListener('touchend', stop); document.removeEventListener('touchcancel', stop); };
-                        document.addEventListener('touchend', stop);
-                        document.addEventListener('touchcancel', stop);
+                        const iv = setInterval(
+                          () => termInstance.scrollLines(-5),
+                          80,
+                        );
+                        const stop = () => {
+                          clearInterval(iv);
+                          document.removeEventListener("touchend", stop);
+                          document.removeEventListener("touchcancel", stop);
+                        };
+                        document.addEventListener("touchend", stop);
+                        document.addEventListener("touchcancel", stop);
                       }}
                     >
                       <Icon name="keyboard-arrow-up" size={22} />
@@ -1358,19 +1673,33 @@ int main()
                       onMouseDown={() => {
                         if (!termInstance) return;
                         termInstance.scrollLines(5);
-                        const iv = setInterval(() => termInstance.scrollLines(5), 80);
-                        const stop = () => { clearInterval(iv); document.removeEventListener('mouseup', stop); document.removeEventListener('mouseleave', stop); };
-                        document.addEventListener('mouseup', stop);
-                        document.addEventListener('mouseleave', stop);
+                        const iv = setInterval(
+                          () => termInstance.scrollLines(5),
+                          80,
+                        );
+                        const stop = () => {
+                          clearInterval(iv);
+                          document.removeEventListener("mouseup", stop);
+                          document.removeEventListener("mouseleave", stop);
+                        };
+                        document.addEventListener("mouseup", stop);
+                        document.addEventListener("mouseleave", stop);
                       }}
                       onTouchStart={(e) => {
                         e.preventDefault();
                         if (!termInstance) return;
                         termInstance.scrollLines(5);
-                        const iv = setInterval(() => termInstance.scrollLines(5), 80);
-                        const stop = () => { clearInterval(iv); document.removeEventListener('touchend', stop); document.removeEventListener('touchcancel', stop); };
-                        document.addEventListener('touchend', stop);
-                        document.addEventListener('touchcancel', stop);
+                        const iv = setInterval(
+                          () => termInstance.scrollLines(5),
+                          80,
+                        );
+                        const stop = () => {
+                          clearInterval(iv);
+                          document.removeEventListener("touchend", stop);
+                          document.removeEventListener("touchcancel", stop);
+                        };
+                        document.addEventListener("touchend", stop);
+                        document.addEventListener("touchcancel", stop);
                       }}
                     >
                       <Icon name="keyboard-arrow-down" size={22} />
@@ -1379,9 +1708,13 @@ int main()
                 </div>
 
                 {/* Stdin / Args - Desktop always visible, mobile tab */}
-                <div class={`flex-1 flex flex-col min-h-0 border-t border-[#27272a] ${activeTab() === "stdin" ? "flex md:hidden" : "hidden md:flex"}`}>
+                <div
+                  class={`flex-1 flex flex-col min-h-0 border-t border-[#27272a] ${activeTab() === "stdin" ? "flex md:hidden" : "hidden md:flex"}`}
+                >
                   <div class="px-3 py-1.5 md:px-4 md:py-2 border-b border-[#27272a] shrink-0">
-                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider">Input & Arguments</span>
+                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider">
+                      Input & Arguments
+                    </span>
                   </div>
                   <div class="flex-1 overflow-y-auto p-3 space-y-3">
                     <div>
@@ -1400,7 +1733,9 @@ int main()
                       <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">
                         Standard Input (stdin)
                         <Show when={sabAvailable()}>
-                          <span class="text-[#52525b] font-normal normal-case ml-1">— pre-input (consumed before terminal input)</span>
+                          <span class="text-[#52525b] font-normal normal-case ml-1">
+                            — pre-input (consumed before terminal input)
+                          </span>
                         </Show>
                       </label>
                       <textarea
@@ -1421,8 +1756,13 @@ int main()
                 <span class={`status-dot ${mode42StatusState()}`}></span>
                 <span class="text-[#52525b]">{mode42StatusText()}</span>
                 <span class="flex-1"></span>
-                <span class="text-[#52525b]" style={{ color: mode42ErrorColor() }}>
-                  {mode42ErrorCount() > 0 ? `${mode42ErrorCount()} error(s)` : ""}
+                <span
+                  class="text-[#52525b]"
+                  style={{ color: mode42ErrorColor() }}
+                >
+                  {mode42ErrorCount() > 0
+                    ? `${mode42ErrorCount()} error(s)`
+                    : ""}
                 </span>
               </div>
             </Show>
@@ -1431,14 +1771,22 @@ int main()
             <Show when={mode42ModalVisible()}>
               <div
                 class="modal-overlay"
-                onPointerDown={(e) => { if (e.target === e.currentTarget) closeHeaderModal42(); }}
+                onPointerDown={(e) => {
+                  if (e.target === e.currentTarget) closeHeaderModal42();
+                }}
               >
                 <div class="modal-box">
-                  <h2 class="text-lg font-bold text-[#d4d4d8] mb-1">42 Header Settings</h2>
-                  <p class="text-xs text-[#52525b] mb-4">Insert the 42 header into your file.</p>
+                  <h2 class="text-lg font-bold text-[#d4d4d8] mb-1">
+                    42 Header Settings
+                  </h2>
+                  <p class="text-xs text-[#52525b] mb-4">
+                    Insert the 42 header into your file.
+                  </p>
                   <div class="space-y-3 mb-5">
                     <div>
-                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">42 Username</label>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">
+                        42 Username
+                      </label>
                       <input
                         type="text"
                         value={mode42ModalUser()}
@@ -1448,7 +1796,9 @@ int main()
                       />
                     </div>
                     <div>
-                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">42 Email</label>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">
+                        42 Email
+                      </label>
                       <input
                         type="text"
                         value={mode42ModalEmail()}
