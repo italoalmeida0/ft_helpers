@@ -373,11 +373,11 @@ const SHARED_42_STYLES = `
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.editable-filename .pencil-icon {
-  opacity: 0;
+.editable-filename .pen-edit {
+  opacity: 0.6;
   transition: opacity 0.15s;
 }
-.editable-filename:hover .pencil-icon {
+.editable-filename:hover .pen-edit {
   opacity: 1;
 }
 `;

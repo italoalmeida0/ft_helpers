@@ -17,11 +17,11 @@ An interactive web-based playground for the 42 `push_swap` project.
 * **Manual Controls:** Execute operations (`sa`, `pb`, `ra`, `rrr`, etc.) manually to debug edge cases, complete with a history log, Undo, and Redo capabilities.
 * **Validation & Benchmarking:** Automatically checks if Stack A is correctly sorted and grades your algorithm's performance based on the official 42 evaluation criteria (for 100 and 500 random numbers).
 
-### 2. [C Playground](https://italoalmeida0.github.io/ft_helpers/c-playground/)
-A general-purpose online C compiler and runtime environment.
+### 2. [C/C++ Playground](https://italoalmeida0.github.io/ft_helpers/c-playground/)
+A general-purpose online C and C++ compiler and runtime environment.
 
 **Key Features:**
-* **In-Browser Compilation:** Compile and run standard C code directly in the browser using WebAssembly. No backend or installation required.
+* **In-Browser Compilation:** Compile and run standard C and C++ code directly in the browser using WebAssembly. No backend or installation required. Rename your file to `.cpp` to compile as C++.
 * **Command-Line Arguments (argv):** Pass custom arguments to your program's `main(int argc, char **argv)` via an easy-to-use input field.
 * **Standard Input (stdin):** Provide input data for `scanf()`, `getchar()`, `fgets()`, and other stdin-reading functions.
 * **Mobile Friendly:** Fully responsive layout with a mobile-optimized interface, including tab switching between the terminal and input panels.

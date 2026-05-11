@@ -6,14 +6,14 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, interactive-widget=resizes-visual, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <title>C Playground – Online C Compiler & IDE | Run C in Browser</title>
+    <title>C/C++ Playground – Online C & C++ Compiler & IDE | Run C/C++ in Browser</title>
     <meta
       name="description"
-      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. Supports stdin, argv, and 42 School project testing. No installation required."
+      content="Free online C and C++ compiler and playground. Write, compile, and run C/C++ code directly in your browser using WebAssembly. Supports stdin, argv, and 42 School project testing. No installation required."
     />
     <meta
       name="keywords"
-      content="online c compiler, c playground, c online, run c online, compile c in browser, webassembly c compiler, c ide online, 42 school c, learn c programming"
+      content="online c compiler, c playground, c++ compiler, online cpp compiler, c online, cpp online, run c online, run c++ online, compile c in browser, compile c++ in browser, webassembly c compiler, webassembly c++ compiler, c ide online, cpp ide online, 42 school c, learn c programming, learn c++ programming"
     />
     <meta name="author" content="Italo Almeida" />
     <meta name="robots" content="index, follow" />
@@ -30,11 +30,11 @@
     />
     <meta
       property="og:title"
-      content="C Playground – Online C Compiler & IDE | Run C in Browser"
+      content="C/C++ Playground – Online C & C++ Compiler & IDE | Run C/C++ in Browser"
     />
     <meta
       property="og:description"
-      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. No installation required."
+      content="Free online C and C++ compiler and playground. Write, compile, and run C/C++ code directly in your browser using WebAssembly. No installation required."
     />
     <meta property="og:site_name" content="ft_helpers" />
     <meta property="og:locale" content="en_US" />
@@ -43,11 +43,11 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="C Playground – Online C Compiler & IDE | Run C in Browser"
+      content="C/C++ Playground – Online C & C++ Compiler & IDE | Run C/C++ in Browser"
     />
     <meta
       name="twitter:description"
-      content="Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly. No installation required."
+      content="Free online C and C++ compiler and playground. Write, compile, and run C/C++ code directly in your browser using WebAssembly. No installation required."
     />
 
     <!-- Structured Data -->
@@ -55,9 +55,9 @@
       {
         "@context": "https://schema.org",
         "@type": "WebApplication",
-        "name": "C Playground",
+        "name": "C/C++ Playground",
         "url": "https://italoalmeida0.github.io/ft_helpers/c-playground/",
-        "description": "Free online C compiler and playground. Write, compile, and run C code directly in your browser using WebAssembly.",
+        "description": "Free online C and C++ compiler and playground. Write, compile, and run C/C++ code directly in your browser using WebAssembly.",
         "applicationCategory": "DeveloperApplication",
         "operatingSystem": "Any",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -485,8 +485,8 @@
           return await responsePromise;
         }
 
-        async compileAndRun(code, args, stdin, stdinSAB) {
-          const data = { code, args, stdin };
+        async compileAndRun(code, args, stdin, stdinSAB, filename) {
+          const data = { code, args, stdin, filename };
           if (stdinSAB) {
             data.stdinSAB = stdinSAB;
             // SharedArrayBuffer is SHARED, not transferred — both threads keep access
@@ -627,9 +627,10 @@
         let stdinPipeWriter = null;
         let terminalDataDisposable = null;
 
-        const defaultCode = `// Welcome to the C Playground!
-// Compile and run C code directly in your browser.
+        const defaultCode = `// Welcome to the C/C++ Playground!
+// Compile and run C or C++ code directly in your browser.
 // Supports argv arguments and stdin input.
+// Rename file to .cpp to compile as C++ (e.g. main.cpp)
 
 #include <stdio.h>
 
@@ -1301,6 +1302,7 @@ int main()
               args,
               stdinInput(),
               sab,
+              codeFilename(),
             );
 
             if (result.error) {
@@ -1373,10 +1375,10 @@ int main()
                 </div>
                 <div class="min-w-0">
                   <h1 class="text-sm md:text-lg font-bold text-[#d4d4d8] truncate">
-                    C Playground
+                    C/C++ Playground
                   </h1>
                   <p class="text-[10px] md:text-xs text-[#52525b] hidden sm:block">
-                    Compile & run C in your browser
+                    Compile & run C/C++ in your browser
                   </p>
                 </div>
               </div>
@@ -1479,10 +1481,10 @@ int main()
                     >
                       {codeFilename()}
                       <Icon
-                        name="edit"
+                        name="edit-square-outline"
                         color="52525b"
-                        size={12}
-                        class="pencil-icon"
+                        size={16}
+                        class="pen-edit"
                       />
                     </span>
                   </Show>

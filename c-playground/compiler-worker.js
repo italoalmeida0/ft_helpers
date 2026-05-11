@@ -882,14 +882,21 @@ const onAnyMessage = async event => {
         let runtimeOutput = [];
 
         try {
-          const { code, args, stdin, stdinSAB } = event.data.data || {};
+          const { code, args, stdin, stdinSAB, filename } = event.data.data || {};
 
           await api.ready;
-          api.memfs.addFile('main.c', code);
+
+          // Determine language mode from filename extension
+          const srcFilename = filename || 'main.c';
+          const isCpp = /\.(cpp|cxx|cc|hpp|hxx|h)$/i.test(srcFilename);
+          const langFlag = isCpp ? '-x c++' : '-x c';
+          const cppExtraArgs = isCpp ? ['-std=c++17', '-stdlib=libc++'] : [];
+
+          api.memfs.addFile(srcFilename, code);
 
           const clang = await api.getModule(api.clangFilename);
           await api.run(clang, 'clang', '-cc1', '-emit-obj',
-                        ...api.clangCommonArgs, '-O2', '-o', 'main.o', '-x', 'c', 'main.c');
+                        ...api.clangCommonArgs, ...cppExtraArgs, '-O2', '-o', 'main.o', '-x', isCpp ? 'c++' : 'c', srcFilename);
 
           await api.link('main.o', 'a.out');
 
