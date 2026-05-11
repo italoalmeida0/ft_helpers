@@ -120,148 +120,7 @@
         }
       }
 
-      /* Lint gutter styling */
-      .cm-lint-marker {
-        width: 8px !important;
-        height: 8px !important;
-      }
-
-      /* Custom lint panel at bottom */
-      .lint-panel {
-        background: #18181b;
-        border-top: 1px solid #27272a;
-        overflow-y: auto;
-        font-family: "Courier New", Courier, monospace;
-        font-size: 12px;
-      }
-
-      .lint-panel-item {
-        padding: 4px 12px;
-        border-bottom: 1px solid #1e1e2e;
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        cursor: pointer;
-        transition: background-color 0.15s;
-      }
-
-      .lint-panel-item:hover {
-        background-color: #27272a;
-      }
-
-      .lint-panel-item .lint-line {
-        color: #52525b;
-        min-width: 50px;
-        flex-shrink: 0;
-      }
-      .lint-panel-item .lint-severity {
-        font-weight: 600;
-        min-width: 40px;
-        flex-shrink: 0;
-      }
-      .lint-panel-item .lint-severity.error {
-        color: #f38ba8;
-      }
-      .lint-panel-item .lint-severity.notice {
-        color: #f9e2af;
-      }
-      .lint-panel-item .lint-name {
-        color: #89b4fa;
-        min-width: 140px;
-        flex-shrink: 0;
-      }
-      .lint-panel-item .lint-text {
-        color: #a6adc8;
-      }
-
-      /* Status bar */
-      .status-bar {
-        background: #18181b;
-        border-top: 1px solid #27272a;
-        font-size: 11px;
-        padding: 2px 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-shrink: 0;
-      }
-
-      .status-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-      }
-
-      .status-dot.loading {
-        background-color: #f9e2af;
-        animation: pulse 1s infinite;
-      }
-      .status-dot.ready {
-        background-color: #a6e3a1;
-      }
-      .status-dot.error {
-        background-color: #f38ba8;
-      }
-      .status-dot.ok {
-        background-color: #a6e3a1;
-      }
-      .status-dot.has-errors {
-        background-color: #f38ba8;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.4;
-        }
-      }
-
-      /* Modal overlay */
-      .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 50;
-        backdrop-filter: blur(4px);
-      }
-
-      .modal-box {
-        background: #18181b;
-        border: 1px solid #27272a;
-        border-radius: 12px;
-        padding: 24px;
-        width: 100%;
-        max-width: 420px;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-      }
-
-      .modal-input {
-        width: 100%;
-        background: #09090b;
-        color: #d4d4d8;
-        border: 1px solid #27272a;
-        border-radius: 8px;
-        padding: 8px 12px;
-        font-size: 14px;
-        font-family: "Courier New", monospace;
-      }
-
-      .modal-input:focus {
-        outline: none;
-        border-color: #2563eb;
-      }
-
-      .modal-input::placeholder {
-        color: #52525b;
-      }
-    </style>
+      </style>
   </head>
   <body class="bg-[#09090b] text-[#d4d4d8] flex flex-col overflow-hidden">
     <div id="root" class="h-full flex flex-col overflow-hidden"></div>
@@ -291,91 +150,16 @@
       import { insertTab, indentLess } from "@codemirror/commands";
       import { linter, lintGutter } from "@codemirror/lint";
       import { Prec } from "@codemirror/state";
+      import { functionLineCount } from "../functionLineCount.js";
+      import { generate42Header, initPyodide42, insert42HeaderIntoCode, injectShared42Styles } from "../shared42.js";
 
-      // ==========================================
-      // 42 HEADER GENERATOR
-      // ==========================================
-      const HEADER_LENGTH = 80;
-      const HEADER_MARGIN = 5;
-      const LS_USER_KEY = "norminette_42_user";
-      const LS_EMAIL_KEY = "norminette_42_email";
+      // Inject shared 42 styles
+      injectShared42Styles();
+
+      const LS_USER_KEY = "42_header_user";
+      const LS_EMAIL_KEY = "42_header_email";
       const LOCAL_STORAGE_KEY = "norminette_online_code";
       const LS_FILENAME_KEY = "norminette_online_filename";
-      const LS_FILETYPE_KEY = "norminette_online_filetype";
-
-      const asciiArt = [
-        "        :::      ::::::::",
-        "      :+:      :+:    :+:",
-        "    +:+ +:+         +:+  ",
-        "  +#+  +:+       +#+     ",
-        "+#+#+#+#+#+   +#+        ",
-        "     #+#    #+#          ",
-        "    ###   ########.fr    ",
-      ];
-
-      function padRight(str, len) {
-        return (str + " ".repeat(len)).substring(0, len);
-      }
-
-      function textLine(left, right) {
-        left = left.substring(
-          0,
-          HEADER_LENGTH - HEADER_MARGIN * 2 - right.length,
-        );
-        const spaces = Math.max(
-          0,
-          HEADER_LENGTH - HEADER_MARGIN * 2 - left.length - right.length,
-        );
-        return (
-          "/*" +
-          " ".repeat(HEADER_MARGIN - 2) +
-          left +
-          " ".repeat(spaces) +
-          right +
-          " ".repeat(HEADER_MARGIN - 2) +
-          "*/"
-        );
-      }
-
-      function formatDate(date) {
-        const y = date.getFullYear();
-        const mo = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
-        const h = String(date.getHours()).padStart(2, "0");
-        const mi = String(date.getMinutes()).padStart(2, "0");
-        const s = String(date.getSeconds()).padStart(2, "0");
-        return `${y}/${mo}/${d} ${h}:${mi}:${s}`;
-      }
-
-      function generate42Header(filename, user, email) {
-        const now = new Date();
-        const dateStr = formatDate(now);
-        const fillLine =
-          "/* " + "*".repeat(HEADER_LENGTH - HEADER_MARGIN - 1) + " */";
-        const blankLine = textLine("", "");
-
-        const lines = [
-          fillLine,
-          blankLine,
-          textLine("", asciiArt[0]),
-          textLine(filename, asciiArt[1]),
-          textLine("", asciiArt[2]),
-          textLine(`By: ${user} <${email}>`, asciiArt[3]),
-          textLine("", asciiArt[4]),
-          textLine(`Created: ${dateStr} by ${user}`, asciiArt[5]),
-          textLine(`Updated: ${dateStr} by ${user}`, asciiArt[6]),
-          blankLine,
-          fillLine,
-        ];
-
-        return lines.join("\n") + "\n\n";
-      }
-
-      function escapeHtml(text) {
-        const div = document.createElement("div");
-        div.textContent = text;
-        return div.innerHTML;
-      }
 
       // ==========================================
       // ICON SYSTEM
@@ -443,14 +227,6 @@
         );
         const [errorCount, setErrorCount] = createSignal(0);
         const [errorCountColor, setErrorCountColor] = createSignal("#52525b");
-        const loadSavedFiletype = () => {
-          try {
-            const saved = localStorage.getItem(LS_FILETYPE_KEY);
-            return saved === ".h" ? ".h" : ".c";
-          } catch (e) {
-            return ".c";
-          }
-        };
 
         const loadSavedFilename = () => {
           try {
@@ -461,8 +237,8 @@
           }
         };
 
-        const [filetype, setFiletype] = createSignal(loadSavedFiletype());
         const [filename, setFilename] = createSignal(loadSavedFilename());
+        const [editingFilename, setEditingFilename] = createSignal(false);
         const [lintResults, setLintResults] = createSignal([]);
         const [lintPanelVisible, setLintPanelVisible] = createSignal(false);
         const [lintPanelHeight, setLintPanelHeight] = createSignal(0);
@@ -560,8 +336,7 @@ int main(){
             const code = view.state.doc.toString();
             if (!code.trim()) return [];
 
-            const ft = filetype();
-            const fn = filename() || "file" + ft;
+            const fn = filename() || "main.c";
 
             try {
               pyodide.globals.set("source_code", code);
@@ -665,7 +440,7 @@ int main(){
         // ==========================================
         // Clear code
         // ==========================================
-        const clearCode = () => {
+        const resetCode = () => {
           if (!confirm("Reset code to default? This will overwrite your current code.")) return;
           cmView.dispatch({
             changes: { from: 0, to: cmView.state.doc.length, insert: defaultCode },
@@ -673,8 +448,8 @@ int main(){
           setLintPanelVisible(false);
           setLintPanelHeight(0);
           updateErrorCount(0);
-          setFiletype(".c");
           setFilename("main.c");
+          try { localStorage.setItem(LS_FILENAME_KEY, "main.c"); } catch (e) {}
           setStatus("ready", "Ready");
         };
 
@@ -717,75 +492,25 @@ int main(){
           setModalVisible(false);
 
           const fn = filename().trim() || "main.c";
-          const header = generate42Header(fn, user, email);
-          const currentCode = cmView.state.doc.toString().trimStart();
-
-          // Smart header detection: ltrim each line, find the last consecutive
-          // line from the top that starts with '/', delete everything up to it
-          // (plus trailing blank lines), then insert the new header.
-          const lines = currentCode.split("\n");
-          let headerEndLine = -1;
-
-          for (let i = 0; i < lines.length; i++) {
-            const trimmed = lines[i].trimStart();
-            if (trimmed.startsWith("/")) {
-              headerEndLine = i;
-            } else {
-              // Stop at first non-'/' line after the header block
-              break;
-            }
-          }
-
-          // Determine where the actual code starts (skip blank lines after header)
-          let codeStartLine = 0;
-          if (headerEndLine >= 0) {
-            codeStartLine = headerEndLine + 1;
-            while (
-              codeStartLine < lines.length &&
-              lines[codeStartLine].trim() === ""
-            ) {
-              codeStartLine++;
-            }
-          }
-
-          const codeWithoutHeader = lines.slice(codeStartLine).join("\n");
+          const currentCode = cmView.state.doc.toString();
+          const newCode = insert42HeaderIntoCode(currentCode, fn, user, email);
 
           cmView.dispatch({
             changes: {
               from: 0,
               to: cmView.state.doc.length,
-              insert: header + codeWithoutHeader,
+              insert: newCode,
             },
           });
 
           setStatus("ready", "42 header inserted");
         };
 
-        // ==========================================
-        // Filetype / Filename sync
-        // ==========================================
-        const onFiletypeChange = (e) => {
-          const newExt = e.target.value;
-          setFiletype(newExt);
-          const current = filename();
-          const base = current.replace(/\.[ch]$/, "");
-          const newName = base + newExt;
-          setFilename(newName);
-          try {
-            localStorage.setItem(LS_FILETYPE_KEY, newExt);
-            localStorage.setItem(LS_FILENAME_KEY, newName);
-          } catch (e) {}
-          if (isReady) forceLint();
-        };
-
         const onFilenameInput = (e) => {
           const val = e.target.value;
           setFilename(val);
-          if (val.endsWith(".h")) setFiletype(".h");
-          else if (val.endsWith(".c")) setFiletype(".c");
           try {
             localStorage.setItem(LS_FILENAME_KEY, val);
-            localStorage.setItem(LS_FILETYPE_KEY, val.endsWith(".h") ? ".h" : ".c");
           } catch (e) {}
           if (isReady) forceLint();
         };
@@ -846,76 +571,16 @@ int main(){
                     }, 1000);
                   }
                 }),
+                functionLineCount(),
               ],
               parent: editorContainerRef,
             });
           }
 
-          // Initialize Pyodide
+          // Initialize Pyodide + norminette + c_formatter_42 using shared helper
           try {
-            pyodide = await loadPyodide();
-            setStatus("loading", "Installing micropip...");
-
-            await pyodide.loadPackage("micropip");
-            const micropip = pyodide.pyimport("micropip");
-
-            setStatus("loading", "Installing norminette...");
-            await micropip.install("norminette");
-
-            setStatus("loading", "Installing c_formatter_42...");
-            await micropip.install("c_formatter_42");
-
-            // Define run_norminette and run_all (without clang_format binary step)
-            await pyodide.runPython(`
-from norminette.context import Context
-from norminette.errors import JSONErrorsFormatter
-from norminette.exceptions import CParsingError
-from norminette.file import File
-from norminette.lexer import Lexer
-from norminette.registry import Registry
-import json
-
-def run_norminette(source_code, filename="main.c"):
-    file = File(filename, source_code)
-    registry = Registry()
-    try:
-        lexer = Lexer(file)
-        tokens = list(lexer)
-        context = Context(file, tokens, debug=0)
-        registry.run(context)
-    except CParsingError as e:
-        return json.dumps({
-            "files": [{"path": filename, "status": "Error",
-                "errors": [{"name": "PARSE_ERROR", "text": str(e.msg), "level": "Error",
-                            "highlights": [{"lineno": 1, "column": 1, "length": 1, "hint": None}]}]
-        }]})
-
-    return str(JSONErrorsFormatter([file], use_colors=False))
-
-from c_formatter_42.formatters.align import align
-from c_formatter_42.formatters.hoist import hoist
-from c_formatter_42.formatters.line_breaker import line_breaker
-from c_formatter_42.formatters.misc import (
-    insert_void,
-    parenthesize_return,
-    remove_multiline_condition_space,
-    space_before_semi_colon,
-)
-from c_formatter_42.formatters.preprocessor_directive import preprocessor_directive
-from c_formatter_42.formatters.return_type_single_tab import return_type_single_tab
-
-def run_all(content):
-    content = preprocessor_directive(content)
-    content = remove_multiline_condition_space(content)
-    content = parenthesize_return(content)
-    content = space_before_semi_colon(content)
-    content = hoist(content)
-    content = align(content)
-    content = return_type_single_tab(content)
-    content = insert_void(content)
-    content = line_breaker(content)
-    return content
-`);
+            const result = await initPyodide42((state, text) => setStatus(state, text));
+            pyodide = result.pyodide;
 
             // Wait for wasm formatter to be ready
             await wasmInitPromise;
@@ -957,24 +622,25 @@ def run_all(content):
               </div>
 
               <div class="flex flex-wrap items-center gap-1 md:gap-2 shrink-0 w-full sm:w-auto">
-                {/* File type selector */}
-                <select
-                  value={filetype()}
-                  onChange={onFiletypeChange}
-                  class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500"
-                >
-                  <option value=".c">.c file</option>
-                  <option value=".h">.h file</option>
-                </select>
-
-                {/* Filename input */}
-                <input
-                  type="text"
-                  value={filename()}
-                  onInput={onFilenameInput}
-                  class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 w-20 md:w-28 font-mono"
-                  placeholder="filename.c"
-                />
+                {/* Filename (editable with pencil click) */}
+                <Show when={!editingFilename()}>
+                  <span class="text-xs font-semibold text-[#a1a1aa] font-mono editable-filename cursor-pointer" onClick={() => setEditingFilename(true)}>
+                    {filename()}
+                    <Icon name="edit" color="a1a1aa" size={12} class="pencil-icon" />
+                  </span>
+                </Show>
+                <Show when={editingFilename()}>
+                  <input
+                    type="text"
+                    value={filename()}
+                    onInput={onFilenameInput}
+                    onBlur={() => setEditingFilename(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { setEditingFilename(false); e.target.blur(); } }}
+                    class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-blue-500 w-20 md:w-28 font-mono"
+                    placeholder="filename.c"
+                    autofocus
+                  />
+                </Show>
 
                 {/* 42 Header button */}
                 <button
@@ -997,13 +663,13 @@ def run_all(content):
                   <span>ft_format</span>
                 </button>
 
-                {/* Clear button */}
+                {/* Reset button */}
                 <button
-                  onClick={clearCode}
+                  onClick={resetCode}
                   class="p-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] transition-colors flex"
-                  title="Clear Code"
+                  title="Reset Code"
                 >
-                  <Icon name="delete" size={16} />
+                  <Icon name="restart-alt" size={16} />
                 </button>
               </div>
             </header>

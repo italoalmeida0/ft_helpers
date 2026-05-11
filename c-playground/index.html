@@ -34,16 +34,30 @@
           "@codemirror/lang-cpp": "https://esm.sh/@codemirror/lang-cpp@6.0.3",
           "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.10.3",
           "@codemirror/state": "https://esm.sh/@codemirror/state@6.6.0",
+          "@codemirror/lint": "https://esm.sh/@codemirror/lint@6.8.4",
           "@replit/codemirror-indentation-markers": "https://esm.sh/@replit/codemirror-indentation-markers@6.5.3",
           "@uiw/codemirror-theme-vscode": "https://esm.sh/@uiw/codemirror-theme-vscode@4.25.9"
         }
       }
     </script>
 
+    <!-- Pyodide (for norminette + c_formatter_42) -->
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/pyodide/v0.29.4/full/pyodide.js"
+    ></script>
+
     <script type="module">
       import babelPresetSolid from "babel-preset-solid";
       import Babel from "@babel/standalone";
       Babel.registerPreset("solid", babelPresetSolid);
+    </script>
+
+    <!-- Wasm formatter (loaded dynamically when Mode 42 is activated) -->
+    <script type="module">
+      import { ensureInit, format } from "../norminette-online/wasm-formatter.js";
+      window.__ftWasmFormat = format;
+      window.__ftWasmFormatInit = ensureInit;
     </script>
 
     <style>
@@ -147,7 +161,7 @@
     <div id="root" class="h-full relative"></div>
 
     <script type="text/babel" data-type="module" data-presets="solid">
-      import { createSignal, createMemo, Show, onMount, onCleanup } from "solid-js";
+      import { createSignal, createMemo, Show, onMount, onCleanup, For } from "solid-js";
       import { render } from "solid-js/web";
       import { Terminal } from "@xterm/xterm";
       import { FitAddon } from "@xterm/addon-fit";
@@ -161,7 +175,16 @@
       import { vscodeDark } from "@uiw/codemirror-theme-vscode";
       import { indentationMarkers } from '@replit/codemirror-indentation-markers';
       import { insertTab, indentLess } from "@codemirror/commands";
-      import { Prec } from '@codemirror/state';
+      import { Prec, Compartment } from '@codemirror/state';
+      import { linter, lintGutter } from "@codemirror/lint";
+      import { functionLineCount } from "../functionLineCount.js";
+      import { generate42Header, initPyodide42, insert42HeaderIntoCode, injectShared42Styles } from "../shared42.js";
+
+      // Inject shared 42 styles
+      injectShared42Styles();
+
+      const LS_USER_KEY = "42_header_user";
+      const LS_EMAIL_KEY = "42_header_email";
 
       // ==========================================
       // STDIN PIPE CONSTANTS (must match worker)
@@ -548,6 +571,238 @@ int main()
 
         const [shareStatus, setShareStatus] = createSignal("idle"); // idle | copied
 
+        // ==========================================
+        // MODE 42 STATE
+        // ==========================================
+        const loadMode42Saved = () => {
+          try { return localStorage.getItem('c_playground_mode42') === '1'; } catch (e) { return false; }
+        };
+        const loadFilenameSaved = () => {
+          try { return localStorage.getItem('c_playground_filename') || 'main.c'; } catch (e) { return 'main.c'; }
+        };
+
+        const [mode42, setMode42] = createSignal(loadMode42Saved());
+        const [mode42StatusState, setMode42StatusState] = createSignal("ready");
+        const [mode42StatusText, setMode42StatusText] = createSignal("");
+        const [mode42ErrorCount, setMode42ErrorCount] = createSignal(0);
+        const [mode42ErrorColor, setMode42ErrorColor] = createSignal("#52525b");
+        const [mode42LintResults, setMode42LintResults] = createSignal([]);
+        const [mode42LintPanelVisible, setMode42LintPanelVisible] = createSignal(false);
+        const [mode42LintPanelHeight, setMode42LintPanelHeight] = createSignal(0);
+        const [mode42ModalVisible, setMode42ModalVisible] = createSignal(false);
+        const [mode42ModalUser, setMode42ModalUser] = createSignal("");
+        const [mode42ModalEmail, setMode42ModalEmail] = createSignal("");
+        const [codeFilename, setCodeFilename] = createSignal(loadFilenameSaved());
+        const [mode42FormatterReady, setMode42FormatterReady] = createSignal(false);
+        const [editingFilename, setEditingFilename] = createSignal(false);
+
+        let pyodide42 = null;
+        let mode42Ready = false;
+        let mode42LinterRef = null;
+        const mode42LintCompartment = new Compartment();
+        const mode42LineCountCompartment = new Compartment();
+
+        const set42Status = (state, text) => {
+          setMode42StatusState(state);
+          setMode42StatusText(text);
+        };
+
+        const update42ErrorCount = (count) => {
+          setMode42ErrorCount(count);
+          setMode42ErrorColor(count > 0 ? "#f38ba8" : "#52525b");
+        };
+
+        const forceLint42 = () => {
+          if (!cmInstance || !mode42Ready) return;
+          cmInstance.dispatch({
+            changes: {
+              from: 0,
+              to: cmInstance.state.doc.length,
+              insert: cmInstance.state.doc.toString(),
+            },
+          });
+        };
+
+        // ==========================================
+        // NORMINETTE LINTER (only active in mode 42)
+        // ==========================================
+        const createNorminetteLinter = () => linter(
+          async (view) => {
+            if (!mode42Ready || !pyodide42) return [];
+            const code = view.state.doc.toString();
+            if (!code.trim()) return [];
+            const fn = codeFilename() || "main.c";
+            try {
+              pyodide42.globals.set("source_code", code);
+              pyodide42.globals.set("file_name", fn);
+              const resultJson = await pyodide42.runPython("run_norminette(source_code, file_name)");
+              const result = JSON.parse(resultJson);
+              const fileInfo = result.files[0];
+              const lintErrors = [];
+              const diagnostics = [];
+              for (const err of fileInfo.errors) {
+                const hl = err.highlights[0];
+                if (!hl) continue;
+                const lineno = Math.max(1, Math.min(hl.lineno, view.state.doc.lines));
+                const line = view.state.doc.line(lineno);
+                const from = line.from + Math.max(0, hl.column - 1);
+                const to = Math.min(from + (hl.length || 1), line.to);
+                diagnostics.push({ from, to, severity: err.level === "Notice" ? "warning" : "error", message: `${err.name}: ${err.text}`, source: "norminette" });
+                lintErrors.push({ lineno: hl.lineno, column: hl.column, level: err.level, name: err.name, text: err.text });
+              }
+              if (fileInfo.status === "OK") {
+                set42Status("ok", "No errors");
+                update42ErrorCount(0);
+              } else {
+                set42Status("has-errors", `${fileInfo.errors.length} error(s)`);
+                update42ErrorCount(fileInfo.errors.length);
+              }
+              // Update lint panel
+              if (lintErrors.length === 0) {
+                setMode42LintPanelVisible(false);
+                setMode42LintPanelHeight(0);
+              } else {
+                setMode42LintPanelVisible(true);
+                setMode42LintPanelHeight(Math.min(200, Math.max(80, lintErrors.length * 30)));
+              }
+              setMode42LintResults(lintErrors);
+              return diagnostics;
+            } catch (err) {
+              console.error("Norminette lint error:", err);
+              return [];
+            }
+          },
+          { delay: 750 },
+        );
+
+        // ==========================================
+        // FORMAT CODE (mode 42)
+        // ==========================================
+        const formatCode42 = async () => {
+          if (!mode42Ready || !mode42FormatterReady() || !cmInstance) return;
+          const code = cmInstance.state.doc.toString();
+          if (!code.trim()) return;
+          try {
+            set42Status("loading", "Formatting...");
+            const clangFormatted = window.__ftWasmFormat(code, codeFilename() || "main.c");
+            pyodide42.globals.set("__ft_code", clangFormatted);
+            const pyFormatted = await pyodide42.runPython("run_all(__ft_code)");
+            if (pyFormatted && pyFormatted !== code) {
+              cmInstance.dispatch({ changes: { from: 0, to: cmInstance.state.doc.length, insert: pyFormatted } });
+              set42Status("ready", "Formatted");
+            } else {
+              set42Status("ready", "Already formatted");
+            }
+          } catch (err) {
+            console.error("Formatter error:", err);
+            set42Status("error", "Format error: " + err.message);
+          }
+        };
+
+        // ==========================================
+        // 42 HEADER MODAL
+        // ==========================================
+        const loadHeaderSettings42 = () => {
+          try {
+            setMode42ModalUser(localStorage.getItem(LS_USER_KEY) || "");
+            setMode42ModalEmail(localStorage.getItem(LS_EMAIL_KEY) || "");
+          } catch (e) {}
+        };
+
+        const openHeaderModal42 = () => {
+          loadHeaderSettings42();
+          setMode42ModalVisible(true);
+        };
+
+        const closeHeaderModal42 = () => {
+          setMode42ModalVisible(false);
+        };
+
+        const insertHeader42 = () => {
+          const user = mode42ModalUser().trim();
+          const email = mode42ModalEmail().trim();
+          if (!user || !email) {
+            set42Status("error", "Please fill in both username and email");
+            return;
+          }
+          try {
+            localStorage.setItem(LS_USER_KEY, user);
+            localStorage.setItem(LS_EMAIL_KEY, email);
+          } catch (e) {}
+          setMode42ModalVisible(false);
+          const fn = codeFilename().trim() || "main.c";
+          const currentCode = cmInstance.state.doc.toString();
+          const newCode = insert42HeaderIntoCode(currentCode, fn, user, email);
+          cmInstance.dispatch({ changes: { from: 0, to: cmInstance.state.doc.length, insert: newCode } });
+          set42Status("ready", "42 header inserted");
+        };
+
+        const onLintItemClick42 = (line, col) => {
+          if (cmInstance && line > 0) {
+            const pos = cmInstance.state.doc.line(Math.min(line, cmInstance.state.doc.lines)).from + Math.max(0, col - 1);
+            cmInstance.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
+            cmInstance.focus();
+          }
+        };
+
+        // ==========================================
+        // TOGGLE MODE 42
+        // ==========================================
+        const toggleMode42 = async () => {
+          const next = !mode42();
+          setMode42(next);
+          try { localStorage.setItem('c_playground_mode42', next ? '1' : '0'); } catch (e) {}
+
+          if (next) {
+            // Activate Mode 42: add lint + line count extensions
+            if (cmInstance) {
+              mode42LinterRef = createNorminetteLinter();
+              cmInstance.dispatch({
+                effects: [
+                  mode42LintCompartment.reconfigure([mode42LinterRef, lintGutter()]),
+                  mode42LineCountCompartment.reconfigure(functionLineCount()),
+                ],
+              });
+            }
+
+            // Load Pyodide if not loaded yet
+            if (!pyodide42) {
+              set42Status("loading", "Loading norminette...");
+              try {
+                const result = await initPyodide42((state, text) => set42Status(state, text));
+                pyodide42 = result.pyodide;
+                mode42Ready = true;
+                setMode42FormatterReady(true);
+                set42Status("ready", "Norminette + formatter loaded");
+                update42ErrorCount(0);
+                forceLint42();
+              } catch (err) {
+                set42Status("error", "Failed to load: " + err.message);
+                console.error("Mode 42 loading error:", err);
+              }
+            } else {
+              // Already loaded, just re-enable
+              mode42Ready = true;
+              set42Status("ready", "Norminette active");
+              forceLint42();
+            }
+          } else {
+            // Deactivate Mode 42: remove lint + line count extensions
+            mode42Ready = false;
+            setMode42LintPanelVisible(false);
+            setMode42LintPanelHeight(0);
+            setMode42StatusText("");
+            if (cmInstance) {
+              cmInstance.dispatch({
+                effects: [
+                  mode42LintCompartment.reconfigure([]),
+                  mode42LineCountCompartment.reconfigure([]),
+                ],
+              });
+            }
+          }
+        };
+
         const loadSavedCode = () => {
           try {
             const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -669,6 +924,8 @@ int main()
                 indentationMarkers(),
                 cpp(),
                 vscodeDark,
+                mode42LintCompartment.of([]),
+                mode42LineCountCompartment.of([]),
                 Prec.highest(
                   keymap.of([
                     {
@@ -736,6 +993,13 @@ int main()
           } catch (err) {
             termInstance.clear();
             termInstance.writeln(`\x1b[31mFailed to initialize compiler: ${err.message}\x1b[0m`);
+          }
+
+          // Auto-activate Mode 42 if it was saved in localStorage
+          if (mode42()) {
+            setMode42(false); // Reset so toggleMode42 will set it to true
+            // Use setTimeout to ensure CM is fully initialized before activating
+            setTimeout(() => toggleMode42(), 100);
           }
         });
 
@@ -852,10 +1116,24 @@ int main()
               });
               setScriptCode(defaultCode);
             }
+            setCodeFilename("main.c");
+            forceLint();
             try {
               localStorage.removeItem(LOCAL_STORAGE_KEY);
+              localStorage.setItem('c_playground_filename', 'main.c');
             } catch (e) {}
           }
+        };
+
+        const forceLint = () => {
+          if (!cmInstance) return;
+          cmInstance.dispatch({
+            changes: {
+              from: 0,
+              to: cmInstance.state.doc.length,
+              insert: cmInstance.state.doc.toString(),
+            },
+          });
         };
 
         return (
@@ -873,6 +1151,18 @@ int main()
               </div>
 
               <div class="flex items-center space-x-1 md:space-x-2 shrink-0">
+
+                {/* Mode 42 Toggle */}
+                <div
+                  class="mode42-toggle"
+                  onClick={toggleMode42}
+                  title={mode42() ? "Mode 42 School ON — click to disable" : "Mode 42 OFF — click to enable norminette + formatter"}
+                >
+                  <span class={`text-[10px] font-bold uppercase tracking-wider ${mode42() ? 'text-orange-400' : 'text-[#52525b]'}`}>42 School</span>
+                  <div class={`mode42-toggle-track ${mode42() ? 'active' : ''}`}>
+                    <div class="mode42-toggle-thumb"></div>
+                  </div>
+                </div>
 
                 <button
                   onClick={shareCode}
@@ -920,12 +1210,81 @@ int main()
             <div class="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
               {/* Editor */}
               <div class="flex-1 flex flex-col min-h-0 min-w-0">
-                <div class="flex items-center px-3 py-1.5 md:px-4 md:py-2 bg-[#09090b] border-b border-[#27272a] shrink-0">
-                  <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider">main.c</span>
+                <div class="flex items-center px-3 py-1.5 md:px-4 md:py-2 bg-[#09090b] border-b border-[#27272a] shrink-0 gap-1">
+                  <Show when={!editingFilename()}>
+                    <span class="text-[10px] md:text-xs font-semibold text-[#52525b] uppercase tracking-wider editable-filename" onClick={() => setEditingFilename(true)}>
+                      {codeFilename()}
+                      <Icon name="edit" color="52525b" size={12} class="pencil-icon" />
+                    </span>
+                  </Show>
+                  <Show when={editingFilename()}>
+                    <input
+                      type="text"
+                      value={codeFilename()}
+                      onInput={(e) => {
+                        setCodeFilename(e.target.value);
+                        forceLint();
+                        try { localStorage.setItem('c_playground_filename', e.target.value); } catch (e) {}
+                      }}
+                      onBlur={() => setEditingFilename(false)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { setEditingFilename(false); e.target.blur(); } }}
+                      class="bg-[#27272a] text-[#a1a1aa] border border-[#3f3f46] rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-orange-500 w-24 md:w-32 font-mono"
+                      placeholder="main.c"
+                      autofocus
+                    />
+                  </Show>
                 </div>
+
+                {/* Mode 42 Toolbar (visible only when mode 42 is active) */}
+                <Show when={mode42()}>
+                  <div class="flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-1.5 bg-[#18181b] border-b border-[#27272a] shrink-0 flex-wrap">
+                    <button
+                      onClick={openHeaderModal42}
+                      class="flex items-center rounded-lg transition-colors px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[10px] md:text-xs font-semibold gap-1 shrink-0"
+                      title="Insert 42 header"
+                    >
+                      <Icon name="table" color="ffffff" size={12} />
+                      <span>Header</span>
+                    </button>
+                    <button
+                      onClick={formatCode42}
+                      disabled={!mode42FormatterReady()}
+                      class="flex items-center rounded-lg transition-colors px-2.5 py-1 disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500 text-white text-[10px] md:text-xs font-semibold gap-1 shrink-0"
+                      title={mode42FormatterReady() ? "Format code (42 style)" : "Formatter loading..."}
+                    >
+                      <Icon name="format-line-spacing" color="ffffff" size={12} />
+                      <span>Format</span>
+                    </button>
+                  </div>
+                </Show>
                 <div class="flex-1 relative min-h-[200px] overflow-hidden border-b md:border-b-0 md:border-r border-[#27272a] bg-[#1e1e1e]">
                   <div ref={codeEditorRef} class="absolute inset-0"></div>
                 </div>
+
+                {/* Norminette Lint Panel (visible only when mode 42 active and errors exist) */}
+                <Show when={mode42() && mode42LintPanelVisible()}>
+                  <div
+                    class="lint-panel shrink-0"
+                    style={{ height: `${mode42LintPanelHeight()}px` }}
+                  >
+                    <For each={mode42LintResults()}>
+                      {(err) => {
+                        const severityClass = err.level === "Notice" ? "notice" : "error";
+                        return (
+                          <div
+                            class="lint-panel-item"
+                            onClick={() => onLintItemClick42(err.lineno, err.column)}
+                          >
+                            <span class="lint-line">L{err.lineno}:C{err.column}</span>
+                            <span class={`lint-severity ${severityClass}`}>{err.level}</span>
+                            <span class="lint-name">{err.name}</span>
+                            <span class="lint-text">{err.text}</span>
+                          </div>
+                        );
+                      }}
+                    </For>
+                  </div>
+                </Show>
               </div>
 
               {/* Terminal / Stdin Panel */}
@@ -1055,6 +1414,67 @@ int main()
                 </div>
               </div>
             </div>
+
+            {/* Mode 42 Status Bar (visible only when mode 42 is active and has status) */}
+            <Show when={mode42() && mode42StatusText()}>
+              <div class="status-bar">
+                <span class={`status-dot ${mode42StatusState()}`}></span>
+                <span class="text-[#52525b]">{mode42StatusText()}</span>
+                <span class="flex-1"></span>
+                <span class="text-[#52525b]" style={{ color: mode42ErrorColor() }}>
+                  {mode42ErrorCount() > 0 ? `${mode42ErrorCount()} error(s)` : ""}
+                </span>
+              </div>
+            </Show>
+
+            {/* 42 Header Modal */}
+            <Show when={mode42ModalVisible()}>
+              <div
+                class="modal-overlay"
+                onPointerDown={(e) => { if (e.target === e.currentTarget) closeHeaderModal42(); }}
+              >
+                <div class="modal-box">
+                  <h2 class="text-lg font-bold text-[#d4d4d8] mb-1">42 Header Settings</h2>
+                  <p class="text-xs text-[#52525b] mb-4">Insert the 42 header into your file.</p>
+                  <div class="space-y-3 mb-5">
+                    <div>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">42 Username</label>
+                      <input
+                        type="text"
+                        value={mode42ModalUser()}
+                        onInput={(e) => setMode42ModalUser(e.target.value)}
+                        class="modal-input"
+                        placeholder="marvin"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] font-semibold text-[#52525b] uppercase tracking-wider mb-1">42 Email</label>
+                      <input
+                        type="text"
+                        value={mode42ModalEmail()}
+                        onInput={(e) => setMode42ModalEmail(e.target.value)}
+                        class="modal-input"
+                        placeholder="marvin@42.fr"
+                      />
+                    </div>
+                  </div>
+                  <div class="flex gap-2 justify-end">
+                    <button
+                      onClick={closeHeaderModal42}
+                      class="px-4 py-2 rounded-lg bg-[#27272a] hover:bg-[#3f3f46] text-[#a1a1aa] text-sm font-semibold transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={insertHeader42}
+                      class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+                    >
+                      Insert Header
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
           </div>
         );
       }
