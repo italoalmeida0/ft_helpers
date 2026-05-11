@@ -882,9 +882,31 @@ const onAnyMessage = async event => {
         let runtimeOutput = [];
 
         try {
-          const { code, args, stdin, stdinSAB, filename } = event.data.data || {};
+          // Changed 'const' to 'let' to allow injecting our buffer-busting code
+          let { code, args, stdin, stdinSAB, filename } = event.data.data || {};
 
           await api.ready;
+
+          // INJECTION: Force unbuffered stdout so printf emits before scanf.
+          // This silently bypasses the need for explicit fflush(stdout) in the user code.
+          const unbufferCode = `
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+__attribute__((constructor)) void __force_unbuffered_stdout() {
+    setvbuf(stdout, NULL, _IONBF, 0);
+}
+
+#ifdef __cplusplus
+}
+#endif
+\n`;
+          
+          // Prepend the injection to the user's code
+          code = unbufferCode + code;
 
           // Determine language mode from filename extension
           const srcFilename = filename || 'main.c';
@@ -903,14 +925,7 @@ const onAnyMessage = async event => {
           const buffer = api.memfs.getFileContents('a.out');
           const wasmMod = await WebAssembly.compile(buffer);
 
-          // Set up stdin: hybrid mode — pre-supplied string + interactive pipe
-          // IMPORTANT: Set this up BEFORE wrapping hostWrite, so that
-          // the stdin pipe is ready when the program starts reading.
-          //
-          // Hybrid approach: Keep the stdin string as pre-supplied input that
-          // is consumed first (immediately available for scanf), then switch
-          // to the interactive StdinPipe for terminal input. This prevents
-          // the race condition where scanf gets EOF before the user can type.
+          
           if (stdinSAB) {
             stdinPipe = new StdinPipe(stdinSAB);
             api.memfs.setStdinPipe(stdinPipe);
@@ -921,7 +936,7 @@ const onAnyMessage = async event => {
             api.memfs.setStdinStr(stdin || '');
           }
 
-          // Now wrap hostWrite for output capture
+          // Now wrap hostWrite for output capture AND real-time streaming
           originalMemfsWrite = api.memfs.hostWrite;
           api.memfs.hostWrite = (s) => {
             runtimeOutput.push(s);
